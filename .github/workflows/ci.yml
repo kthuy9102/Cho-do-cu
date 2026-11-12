@@ -49,6 +49,7 @@ jobs:
           JWT_SECRET_KEY: ci_secret_key_change_me_32_chars_min
           UPLOAD_DIR: /tmp/uploads
           APP_ENV: test
+          PYTHONPATH: .
         run: pytest -q --cov=app --cov-report=term-missing
 
   frontend:
