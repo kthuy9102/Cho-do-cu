@@ -1,0 +1,57 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: cudo
+      POSTGRES_PASSWORD: cudo_secret
+      POSTGRES_DB: cudo
+    ports:
+      - "5432:5432"  # <-- Mở port để DBeaver bên ngoài kết nối vào
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cudo -d cudo"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks: [cudo_net]
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      # Chuỗi kết nối DB dùng user/pass ở trên
+      DATABASE_URL: postgresql+psycopg://cudo:cudo_secret@db:5432/cudo
+      UPLOAD_DIR: /app/uploads
+    volumes:
+      - uploads:/app/uploads
+    depends_on:
+      db:
+        condition: service_healthy
+    networks: [cudo_net]
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+      args:
+        VITE_API_BASE: /api/v1
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    volumes:
+      - uploads:/usr/share/nginx/uploads:ro
+    depends_on: [api]
+    networks: [cudo_net]
+
+volumes:
+  pgdata:
+  uploads:
+
+networks:
+  cudo_net:
+    driver: bridge
