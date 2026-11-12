@@ -1,0 +1,4 @@
+[lint]
+# FastAPI uses Depends(), Query(), and File() as declarative parameter defaults.
+# B008 flags this established dependency-injection pattern as a false positive.
+ignore = ["B008"]
