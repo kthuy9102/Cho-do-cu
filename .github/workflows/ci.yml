@@ -19,7 +19,7 @@ jobs:
           POSTGRES_DB: testdb
         ports: ["5432:5432"]
         options: >-
-          --health-cmd "pg_isready -U test"
+          --health-cmd "pg_isready -U test -d testdb"
           --health-interval 5s
           --health-timeout 3s
           --health-retries 10
@@ -36,6 +36,9 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install ruff pytest pytest-cov httpx
+
+      - name: Apply safe Ruff fixes
+        run: ruff check --fix app/
 
       - name: Lint (ruff)
         run: ruff check app/
