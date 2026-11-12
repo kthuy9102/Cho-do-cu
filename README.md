@@ -16,3 +16,11 @@ docker compose up -d --build
 ```bash
 docker compose exec api python seed.py
 ```
+### Truy cập WebAPI
+```bash
+https://localhost:8080/docs
+```
+### Trang chủ 
+```bash
+https://localhost:8080
+```
