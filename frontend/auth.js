@@ -2,7 +2,7 @@
 const UKEY='cdcsv_users',SKEY='cdcsv_session',AKEY='cdcsv_admin';
 const GOOGLE_CLIENT_ID=''; // Dán Client ID lấy từ Google Cloud Console vào đây để dùng đăng nhập Google thật
 const ADMIN={email:'admin@demo.vn',pw:'admin123'};
-const AUTH_API='http://localhost:8001/api/v1',AUTH_TOKEN_KEY='cdcsv_token',AUTH_BUSER_KEY='cdcsv_buser';
+const AUTH_API=(location.port==="5500"?"http://localhost:8001":"")+"/api/v1",AUTH_TOKEN_KEY="cdcsv_token",AUTH_BUSER_KEY="cdcsv_buser";
 
 async function sha(p){
   try{const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode('cdcsv:'+p));return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('')}
@@ -69,7 +69,7 @@ async function authFetchMe(tk){
 async function login(email,pw){
   if(!email)return{ok:false,field:'email',msg:'Nhập email.'};
   if(!pw)return{ok:false,field:'pw',msg:'Nhập mật khẩu.'};
-  email=email.trim();
+  email=email.trim().toLowerCase();
   let res;
   try{
     res=await fetch(AUTH_API+'/auth/login',{
@@ -78,28 +78,37 @@ async function login(email,pw){
       body:new URLSearchParams({username:email,password:pw})
     });
   }catch(e){
-    console.warn('Không gọi được backend (mạng/CORS):',e);
-    return authLoginLocal(email,pw);
+    console.error('Không kết nối được Backend:',e);
+    return{ok:false,field:'pw',msg:'Không kết nối được máy chủ. Vui lòng thử lại.'};
   }
+  const data=await res.json().catch(()=>({}));
   if(!res.ok){
-    console.warn('Backend trả về',res.status,await res.text());
-    return authLoginLocal(email,pw);
+    const msg=data?.error?.message||data?.detail||'Email hoặc mật khẩu không đúng.';
+    console.warn('Backend trả về',res.status,data);
+    return{ok:false,field:'pw',msg};
   }
-  const {access_token}=await res.json();
-  localStorage.setItem(AUTH_TOKEN_KEY,access_token);
-  const me=(await authFetchMe(access_token))||{};
+  const access_token=data.access_token;
+  const me=data.user;
+  if(!access_token||!me){
+    console.error('Phản hồi login thiếu access_token hoặc user:',data);
+    return{ok:false,field:'pw',msg:'Phản hồi đăng nhập từ máy chủ không hợp lệ.'};
+  }
   const role=String(me.role||'student').toLowerCase();
   const u={
-    id:(me.id!==undefined&&me.id!==null?me.id:email),
-    name:me.full_name||me.name||email.split('@')[0],
-    email:me.email||email.toLowerCase(),
-    mssv:me.student_id||me.mssv||'',
-    phone:me.phone||'',
-    role,backend:true
+    id:me.id,
+    name:me.full_name||email.split('@')[0],
+    email:me.email||email,
+    mssv:me.student_id||'',
+    phone:'',
+    role,
+    backend:true
   };
+  localStorage.removeItem(SKEY);
+  localStorage.setItem(AUTH_TOKEN_KEY,access_token);
   localStorage.setItem(AUTH_BUSER_KEY,JSON.stringify(u));
-  if(role==='admin'||role.startsWith('mod'))localStorage.setItem(AKEY,'1');
-  return{ok:true,role}
+  if(role==='admin'||role==='moderator')localStorage.setItem(AKEY,'1');
+  else localStorage.removeItem(AKEY);
+  return{ok:true,role};
 }
 
 async function loginGoogle(p){
