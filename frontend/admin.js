@@ -17,7 +17,7 @@ function loginHtml(){return `<div class="card pad" style="max-width:420px;margin
  <span class="err" id="aer"></span><button class="btn" onclick="adminIn()">Đăng nhập</button>
  <a href="index.html" class="mut">← Về trang chợ sinh viên</a></div></div>`}
 async function adminIn(){
-  const email=$('#ae').value.trim(), password=$('#ap').value;
+  const email=$('#ae').value.trim().toLowerCase(), password=$('#ap').value;
   const btn=$('#app').querySelector('button.btn');
   const err=$('#aer');
   err.textContent='';
@@ -28,7 +28,8 @@ async function adminIn(){
       err.textContent=result.msg||'Đăng nhập thất bại.';
       return;
     }
-    if(result.role!=='admin'&&result.role!=='moderator'){
+    const role=String(result.role||'').trim().toLowerCase();
+    if(role!=='admin'&&role!=='moderator'){
       logout();
       err.textContent='Tài khoản này không có quyền quản trị.';
       return;
