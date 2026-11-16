@@ -41,9 +41,32 @@ def main() -> int:
         Base.metadata.create_all(engine)
 
     with SessionLocal() as db:
-        if db.query(User).first() is not None:
-            print("Đã có dữ liệu, bỏ qua seed.")
+        existing_users = {user.email: user for user in db.query(User).all()}
+        if existing_users:
+            # Database có thể đã có tài khoản sinh viên được tạo trước khi chạy seed.
+            # Bổ sung các tài khoản demo còn thiếu, tuyệt đối không ghi đè mật khẩu/vai trò
+            # của tài khoản đã tồn tại.
+            added = []
+            for email, password, name, role in DEMO_ACCOUNTS:
+                if email not in existing_users:
+                    db.add(
+                        User(
+                            email=email,
+                            hashed_password=hash_password(password),
+                            full_name=name,
+                            role=role,
+                        )
+                    )
+                    added.append(email)
+            db.commit()
+            if added:
+                print("Đã bổ sung tài khoản demo còn thiếu:")
+                for email in added:
+                    print(f"  {email}")
+            else:
+                print("Các tài khoản demo đã tồn tại; không thay đổi dữ liệu.")
             return 0
+
         users = {}
         for email, password, name, role in DEMO_ACCOUNTS:
             user = User(email=email, hashed_password=hash_password(password), full_name=name, role=role)
