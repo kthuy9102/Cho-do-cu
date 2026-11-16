@@ -32,6 +32,11 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--create-tables", action="store_true", help="tạo bảng bằng create_all (chỉ dùng khi dev)")
     parser.add_argument("--force", action="store_true", help="cho phép chạy khi ENVIRONMENT=production")
+    parser.add_argument(
+        "--reset-demo-admin",
+        action="store_true",
+        help="tạo hoặc đặt lại admin@example.com / Admin12345 (chỉ dùng môi trường dev)",
+    )
     args = parser.parse_args()
 
     if get_settings().environment == "production" and not args.force:
@@ -41,6 +46,19 @@ def main() -> int:
         Base.metadata.create_all(engine)
 
     with SessionLocal() as db:
+        if args.reset_demo_admin:
+            email, password, name, role = DEMO_ACCOUNTS[0]
+            admin = db.query(User).filter(User.email == email).first()
+            if admin is None:
+                admin = User(email=email, full_name=name, role=role)
+                db.add(admin)
+            admin.hashed_password = hash_password(password)
+            admin.full_name = name
+            admin.role = role
+            admin.is_active = True
+            db.commit()
+            print(f"Đã tạo/đặt lại tài khoản quản trị: {email}")
+
         existing_users = {user.email: user for user in db.query(User).all()}
         if existing_users:
             # Database có thể đã có tài khoản sinh viên được tạo trước khi chạy seed.
