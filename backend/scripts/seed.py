@@ -46,20 +46,20 @@ def main() -> int:
         Base.metadata.create_all(engine)
 
     with SessionLocal() as db:
-        if args.reset_demo_admin:
+        existing_users = {user.email: user for user in db.query(User).all()}
+        if args.reset_demo_admin and existing_users:
             email, password, name, role = DEMO_ACCOUNTS[0]
-            admin = db.query(User).filter(User.email == email).first()
+            admin = existing_users.get(email)
             if admin is None:
                 admin = User(email=email, full_name=name, role=role)
                 db.add(admin)
+                existing_users[email] = admin
             admin.hashed_password = hash_password(password)
             admin.full_name = name
             admin.role = role
             admin.is_active = True
             db.commit()
             print(f"Đã tạo/đặt lại tài khoản quản trị: {email}")
-
-        existing_users = {user.email: user for user in db.query(User).all()}
         if existing_users:
             # Database có thể đã có tài khoản sinh viên được tạo trước khi chạy seed.
             # Bổ sung các tài khoản demo còn thiếu, tuyệt đối không ghi đè mật khẩu/vai trò
