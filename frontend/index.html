@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Chợ đồ cũ sinh viên</title>
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="orders.css">
+
+</head>
+<body>
+<header><div class="hd">
+  <a class="logo" href="#home"><i>🛍️</i>CHỢ ĐỒ CŨ SINH VIÊN</a>
+  <button class="hn" onclick="go('home')">🖥️<span>Sản phẩm</span></button>
+  <button class="hn" onclick="toast('Chat nằm ngoài phạm vi đề tài. Hãy dùng Đề nghị mua để liên hệ người bán.')">💬<span>Chat</span><i class="dot"></i></button>
+  <button class="btn" onclick="openPost()">Đăng tin</button>
+  <div class="who" id="who"></div>
+</div></header>
+
+<main>
+<aside class="side lf">
+  <div class="card prof"><div class="av lg" id="pav">T</div><div><b id="pn"></b><small id="ph"></small></div></div>
+  <nav class="card nv" id="nv"></nav>
+  <div class="card cats"><div class="hh">Danh mục thiết yếu</div><div id="cats"></div></div>
+</aside>
+
+<section>
+  <div id="cmp" class="card cmp"><div class="av" id="cav">T</div><button onclick="openPost()" id="cmpt"></button></div>
+  <div id="sc" class="card pad">
+    <div class="sh"><span>📦</span>Tìm kiếm sản phẩm</div>
+    <input class="sin" id="q" placeholder="Tìm kiếm sản phẩm, danh mục..." aria-label="Tìm kiếm" onkeydown="if(event.key==='Enter')search()">
+    <div class="chips" id="chips"></div>
+    <div class="row"><button class="btn" onclick="search()">🔍 Tìm kiếm</button><button class="ico" aria-label="Bộ lọc" onclick="$('#flt').classList.toggle('show')">⚙️</button></div>
+    <div id="flt">
+      <label>Danh mục<select class="sin" id="fc"></select></label>
+      <label>Giá từ (đ)<input class="sin" id="fmin" type="number" min="0"></label>
+      <label>Đến (đ)<input class="sin" id="fmax" type="number" min="0"></label>
+      <label>Sắp xếp<select class="sin" id="fs"><option value="all">Mặc định</option><option value="new">Mới nhất</option><option value="high">Giá giảm dần</option><option value="low">Giá tăng dần</option></select></label>
+    </div>
+  </div>
+  <div id="res"></div>
+</section>
+
+<aside class="side rt">
+  <div class="card pad"><div class="sh" style="font-size:18px;margin-bottom:8px"><span>🔥</span>Tìm kiếm nhiều</div><div id="trend"></div></div>
+  <div class="card pad"><div class="sh" style="font-size:18px;margin-bottom:8px"><span>📈</span>Thống kê hôm nay</div>
+    <div class="stat">Sản phẩm mới<b style="color:var(--g)" id="s1"></b></div><div class="stat">Người dùng online<b>● 1</b></div></div>
+  <div class="card pad"><div class="sh" style="font-size:18px;margin-bottom:8px"><span style="color:var(--g)">●</span>Đang trực tuyến</div><div class="who" id="onl"></div></div>
+  <div class="card pad"><div class="sh" style="font-size:18px;margin-bottom:8px"><span>📦</span>Danh mục nổi bật</div><div class="chips" style="margin:0" id="hot"></div></div>
+</aside>
+</main>
+<p style="text-align:center;margin:0 0 24px"><button class="btn o sm" onclick="resetData()">Đặt lại dữ liệu mẫu</button></p>
+<dialog id="dlg"></dialog>
+<div id="toast" role="status"></div>
+
+<script src="data.js"></script>
+<script src="api.js"></script>
+<script src="auth.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Đăng nhập – Chợ đồ cũ sinh viên</title>
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="auth.css">
+</head>
+<body class="auth">
+<div class="aw">
+  <aside class="ab">
+    <a class="logo" href="index.html"><i>🛍️</i>CHODOCUSV</a>
+    <div>
+      <h1>Đồ cũ của bạn là đồ cần của bạn học khóa dưới.</h1>
+      <p>Bán lại giáo trình, đồ dùng sau mỗi học kỳ ngay trong trường, an toàn hơn đăng nhóm mạng xã hội.</p>
+    </div>
+    <ul><li>Tin đăng được kiểm duyệt trước khi hiển thị</li><li>Đánh giá người bán sau mỗi giao dịch</li><li>Người mua và người bán đều là sinh viên</li></ul>
+  </aside>
+
+  <section class="af">
+    <div class="atabs"><button id="t1" onclick="location.hash='login'">Đăng nhập</button><button id="t2" onclick="location.hash='register'">Đăng ký</button></div>
+
+    <button class="gbtn" id="gg" onclick="$('#gd').showModal()">
+      <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.8 2.4 30.3 0 24 0 14.6 0 6.5 5.4 2.6 13.2l7.9 6.1C12.4 13.6 17.7 9.5 24 9.5z"/><path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.7c-.6 3-2.2 5.4-4.7 7.1l7.6 5.9c4.4-4.1 6.9-10.1 6.9-17.5z"/><path fill="#FBBC05" d="M10.5 28.7a14.5 14.5 0 0 1 0-9.4l-7.9-6.1a24 24 0 0 0 0 21.6l7.9-6.1z"/><path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.6-5.9c-2.1 1.4-4.9 2.3-8.3 2.3-6.3 0-11.6-4.1-13.5-9.8l-7.9 6.1C6.5 42.6 14.6 48 24 48z"/></svg>
+      Tiếp tục với Google
+    </button>
+    <div id="gsi"></div>
+    <div class="or"><span>hoặc dùng email</span></div>
+
+    <form id="fl" novalidate>
+      <label class="f">Email<input name="email" type="email" autocomplete="username" placeholder="ten@truong.edu.vn"><span class="err" data-e="email"></span></label>
+      <label class="f">Mật khẩu<div class="pw"><input name="pw" type="password" autocomplete="current-password"><button type="button" onclick="eye(this)">Hiện</button></div><span class="err" data-e="pw"></span></label>
+      <a href="#login" onclick="toast('Tính năng quên mật khẩu sẽ gửi email khi có backend.');return false" style="font-size:13px">Quên mật khẩu?</a>
+      <button class="btn" type="submit">Đăng nhập</button>
+
+    </form>
+
+    <form id="fr" novalidate hidden>
+      <label class="f">Họ và tên<input name="name" autocomplete="name" placeholder="Nguyễn Văn A"><span class="err" data-e="name"></span></label>
+      <div class="two">
+        <label class="f">Mã sinh viên<input name="mssv" placeholder="VD: 2251012345"><span class="err" data-e="mssv"></span></label>
+        <label class="f">Số điện thoại<input name="phone" type="tel" autocomplete="tel" placeholder="0912345678"><span class="err" data-e="phone"></span></label>
+      </div>
+      <label class="f">Email<input name="email" type="email" autocomplete="email" placeholder="ten@truong.edu.vn"><span class="err" data-e="email"></span></label>
+      <label class="f">Mật khẩu<div class="pw"><input name="pw" type="password" autocomplete="new-password" placeholder="Ít nhất 8 ký tự, có chữ và số"><button type="button" onclick="eye(this)">Hiện</button></div><span class="err" data-e="pw"></span></label>
+      <label class="f">Nhập lại mật khẩu<input name="pw2" type="password" autocomplete="new-password"><span class="err" data-e="pw2"></span></label>
+      <label class="chk"><input type="checkbox" name="agree"><span>Tôi đồng ý với điều khoản sử dụng và cam kết đăng tin đúng sự thật.<br><span class="err" data-e="agree"></span></span></label>
+      <button class="btn" type="submit">Tạo tài khoản</button>
+    </form>
+  </section>
+</div>
+
+<dialog id="gd">
+  <div class="dh">Chọn tài khoản Google (giả lập)<button aria-label="Đóng" onclick="$('#gd').close()">×</button></div>
+  <form class="db" id="fg" novalidate>
+    <div class="hint">Đây là bản demo chưa có Google Client ID. Nhập tên và email bất kỳ để thử luồng đăng nhập. Muốn dùng Google thật, dán Client ID vào biến <b>GOOGLE_CLIENT_ID</b> trong <b>auth.js</b>.</div>
+    <label class="f">Tên hiển thị<input name="name" placeholder="Tên của bạn"></label>
+    <label class="f">Email Google<input name="email" type="email" placeholder="ban@gmail.com"><span class="err" data-e="email"></span></label>
+    <button class="btn" type="submit">Tiếp tục</button>
+  </form>
+</dialog>
+<div id="toast" role="status"></div>
+<script src="auth.js"></script>
+<script>
+const $=s=>document.querySelector(s);
+function toast(m){const t=$('#toast');t.textContent=m;t.style.display='block';clearTimeout(toast.h);toast.h=setTimeout(()=>t.style.display='none',3000)}
+function eye(b){const i=b.previousElementSibling,show=i.type==='password';i.type=show?'text':'password';b.textContent=show?'Ẩn':'Hiện'}
+function err(f,n,m){const e=f.querySelector(`[data-e="${n}"]`);if(!e)return;e.textContent=m||'';const l=e.closest('.f');if(l)l.classList.toggle('bad',!!m)}
+function show(){const r=location.hash==='#register';$('#fl').hidden=r;$('#fr').hidden=!r;$('#t1').classList.toggle('on',!r);$('#t2').classList.toggle('on',r);document.title=(r?'Đăng ký':'Đăng nhập')+' – Chợ đồ cũ sinh viên'}
+function done(msg){toast(msg);setTimeout(()=>location.href='index.html',500)}
+if(session())location.replace('index.html');
+addEventListener('hashchange',show);show();
+
+$('#fl').addEventListener('submit',async e=>{e.preventDefault();const f=e.target;['email','pw'].forEach(n=>err(f,n,''));
+  const r=await login(f.elements.email.value.trim(),f.elements.pw.value);
+  if(!r.ok)return err(f,r.field,r.msg);
+  done('Đăng nhập thành công.')});
+
+$('#fr').addEventListener('submit',async e=>{e.preventDefault();const f=e.target;['name','mssv','phone','email','pw','pw2','agree'].forEach(n=>err(f,n,''));
+  const v=Object.fromEntries(new FormData(f));
+  const r=await register(v);
+  if(!r.ok)return Object.entries(r.errors).forEach(([k,m])=>err(f,k,m));
+  done('Tạo tài khoản thành công.')});
+
+$('#fg').addEventListener('submit',async e=>{e.preventDefault();const f=e.target;err(f,'email','');
+  const email=f.elements.email.value.trim();
+  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))return err(f,'email','Email không hợp lệ.');
+  await loginGoogle({name:f.elements.name.value.trim(),email});done('Đăng nhập bằng Google thành công.')});
+
+if(GOOGLE_CLIENT_ID){
+  const s=document.createElement('script');s.src='https://accounts.google.com/gsi/client';s.async=true;
+  s.onload=()=>{google.accounts.id.initialize({client_id:GOOGLE_CLIENT_ID,callback:async r=>{const p=decodeJwt(r.credential);await loginGoogle({name:p.name,email:p.email});done('Đăng nhập bằng Google thành công.')}});
+    $('#gg').hidden=true;google.accounts.id.renderButton($('#gsi'),{theme:'outline',size:'large',width:380,text:'continue_with',locale:'vi'})};
+  document.head.appendChild(s);
+}
+</script>
+</body>
+</html>
