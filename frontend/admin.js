@@ -1,5 +1,5 @@
 /* Trang quản trị dành riêng cho kiểm duyệt viên. Dùng chung dữ liệu với trang chợ qua data.js. */
-const ADM=()=>localStorage.getItem(AKEY)==='1';
+const ADM=()=>{try{const u=JSON.parse(localStorage.getItem(AUTH_BUSER_KEY)||'null');return localStorage.getItem(AKEY)==='1'&&!!localStorage.getItem(AUTH_TOKEN_KEY)&&!!u&&['admin','moderator'].includes(String(u.role||'').trim().toLowerCase())}catch(e){return false}};
 let tab='pending';
 getUsers().forEach(u=>U[u.id]={n:u.name,h:'@'+u.email.split('@')[0]});
 const un=id=>U[id]?U[id].n:'Người dùng';
