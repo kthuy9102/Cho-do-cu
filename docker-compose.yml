@@ -1,0 +1,78 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: chodocu-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-chodocu}
+      POSTGRES_USER: ${POSTGRES_USER:-chodocu}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in the root .env file}
+      TZ: Asia/Ho_Chi_Minh
+    ports:
+      # Dùng 5433 ở máy host để không đụng PostgreSQL đang chạy ở cổng 5432.
+      - "127.0.0.1:5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-chodocu} -d ${POSTGRES_DB:-chodocu}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    networks:
+      - chodocu-network
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: chodocu-api
+    restart: unless-stopped
+    environment:
+      ENVIRONMENT: development
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-chodocu}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in the root .env file}@db:5432/${POSTGRES_DB:-chodocu}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:?Set JWT_SECRET_KEY in the root .env file}
+      ACCESS_TOKEN_EXPIRE_MINUTES: 60
+      UPLOAD_DIR: /app/uploads
+      MAX_UPLOAD_SIZE_MB: 5
+      MAX_IMAGES_PER_LISTING: 5
+      MAX_LISTINGS_PER_DAY: 5
+      CORS_ORIGINS: '["http://localhost:8080"]'
+      LOG_LEVEL: INFO
+      LOG_JSON: "true"
+      TZ: Asia/Ho_Chi_Minh
+    volumes:
+      - uploads_data:/app/uploads
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    networks:
+      - chodocu-network
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    container_name: chodocu-web
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - chodocu-network
+
+volumes:
+  postgres_data:
+  uploads_data:
+
+networks:
+  chodocu-network:
+    driver: bridge
