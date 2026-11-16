@@ -1,0 +1,787 @@
+{
+  "info": {
+    "_postman_id": "2534784c-dd13-43ac-9eb9-6435e8e40fcb",
+    "name": "Chợ đồ cũ - 20 API chính (Nhóm 4)",
+    "description": "20 request ứng với 20 endpoint chính, theo đúng thứ tự một luồng nghiệp vụ hoàn chỉnh: đăng ký, đăng nhập 4 vai trò, đăng tin, duyệt, tìm kiếm, mua, chấp nhận, đánh giá, báo cáo.\n\nĐiều kiện: server chạy, đã seed, import kèm environment. Chạy bằng Runner theo thứ tự; request 20 cần chọn file nên bỏ tick khi chạy Runner. Mỗi lần chạy tạo 3 tin của người bán (giới hạn 5 tin/24 giờ: đặt MAX_LISTINGS_PER_DAY=50 khi test). Các ca lỗi (401, 403, 409, 422...) nằm ở collection đầy đủ 82 request.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "noauth"
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "if (!pm.collectionVariables.get(\"run_id\")) { pm.collectionVariables.set(\"run_id\", Date.now().toString()); }"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "run_id",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "01 POST /auth/register - Đăng ký",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "auth": {
+          "type": "noauth"
+        },
+        "url": "{{api}}/auth/register",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"sv.{{run_id}}@example.com\",\n  \"password\": \"Abc12345\",\n  \"full_name\": \"Sinh Viên Thử\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.collectionVariables.set(\"run_id\", Date.now().toString());"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Mã trạng thái là 201\", function () { pm.response.to.have.status(201); });",
+              "pm.test(\"Vai trò luôn là student, không lộ mật khẩu\", function () { const j = pm.response.json(); pm.expect(j.role).to.eql(\"student\"); pm.expect(j).to.not.have.property(\"hashed_password\"); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "02 POST /auth/login - Đăng nhập (người bán, và lấy token cả 3 vai trò còn lại)",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "auth": {
+          "type": "noauth"
+        },
+        "url": "{{api}}/auth/login",
+        "body": {
+          "mode": "urlencoded",
+          "urlencoded": [
+            {
+              "key": "username",
+              "value": "{{seller_email}}"
+            },
+            {
+              "key": "password",
+              "value": "{{user_password}}"
+            }
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Mã trạng thái là 200\", function () { pm.response.to.have.status(200); });",
+              "pm.test(\"Có access_token, đúng người bán\", function () { const j = pm.response.json(); pm.expect(j.access_token).to.be.a(\"string\"); pm.expect(j.user.role).to.eql(\"student\"); });",
+              "pm.collectionVariables.set(\"seller_token\", pm.response.json().access_token);",
+              "pm.collectionVariables.set(\"seller_id\", pm.response.json().user.id);",
+              "const api = pm.variables.replaceIn(\"{{base_url}}\") + \"/api/v1\";",
+              "const roles = [[\"admin_email\",\"admin_password\",\"admin_token\",\"admin_id\"],[\"mod_email\",\"mod_password\",\"mod_token\",\"mod_id\"],[\"buyer_email\",\"user_password\",\"buyer_token\",\"buyer_id\"]];",
+              "roles.forEach(function (r) {",
+              "  pm.sendRequest({ url: api + \"/auth/login\", method: \"POST\", body: { mode: \"urlencoded\", urlencoded: [{ key: \"username\", value: pm.environment.get(r[0]) }, { key: \"password\", value: pm.environment.get(r[1]) }] } }, function (err, res) {",
+              "    pm.test(\"Đăng nhập \" + r[0] + \" thành công\", function () { pm.expect(err).to.eql(null); pm.expect(res.code).to.eql(200); });",
+              "    if (!err && res.code === 200) { pm.collectionVariables.set(r[2], res.json().access_token); pm.collectionVariables.set(r[3], res.json().user.id); }",
+              "  });",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "03 GET /users/me - Thông tin tài khoản (người mua)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{buyer_token}}",
+              "type": "string"
+            }
+          ]
+        },
+        "url": "{{api}}/users/me"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Mã trạng thái là 200\", function () { pm.response.to.have.status(200); });",
+              "pm.test(\"Đúng người mua\", function () { const j = pm.response.json(); pm.expect(j.email).to.eql(pm.environment.get(\"buyer_email\")); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "04 GET /categories - Danh sách danh mục (khách)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "auth": {
+          "type": "noauth"
+        },
+        "url": "{{api}}/categories"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Mã trạng thái là 200\", function () { pm.response.to.have.status(200); });",
+              "pm.test(\"Là một mảng\", function () { const j = pm.response.json(); pm.expect(j).to.be.an('array'); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "05 POST /categories - Tạo danh mục (admin)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{admin_token}}",
+              "type": "string"
+            }
+          ]
+        },
+        "url": "{{api}}/categories",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Danh mục thử {{run_id}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Mã trạng thái là 201\", function () { pm.response.to.have.status(201); });",
+              "pm.collectionVariables.set(\"category_id\", pm.response.json().id);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "06 POST /listings - Đăng tin (người bán)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{seller_token}}",
+              "type": "string"
+            }
+          ]
+        },
+        "url": "{{api}}/listings",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"title\": \"Sách thử Postman {{run_id}}\",\n  \"description\": \"Mô tả tin thử nghiệm do Postman tạo ra, đủ độ dài tối thiểu.\",\n  \"price\": 45000,\n  \"condition\": \"good\",\n  \"category_id\": {{category_id}}\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Mã trạng thái là 201\", function () { pm.response.to.have.status(201); });",
+              "pm.test(\"Trạng thái chờ duyệt\", function () { const j = pm.response.json(); pm.expect(j.status).to.eql(\"pending\"); });",
+              "pm.collectionVariables.set(\"listing_id\", pm.response.json().id);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "07 POST /moderation/listings/{id}/approve - Duyệt tin (moderator)",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{mod_token}}",
+              "type": "string"
+            }
+          ]
+        },
+        "url": "{{api}}/moderation/listings/{{listing_id}}/approve"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Mã trạng thái là 200\", function () { pm.response.to.have.status(200); });",
+              "pm.test(\"Đã duyệt\", function () { const j = pm.response.json(); pm.expect(j.status).to.eql(\"approved\"); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "08 GET /listings - Tìm kiếm, lọc, sắp xếp, phân trang (khách)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "auth": {
+          "type": "noauth"
+        },
+        "url": "{{api}}/listings?q={{run_id}}&category_id={{category_id}}&min_price=1&max_price=100000&sort=price_asc&page=1&page_size=5"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Mã trạng thái là 200\", function () { pm.response.to.have.status(200); });",
+              "pm.test(\"Thấy đúng tin vừa duyệt\", function () { const j = pm.response.json(); pm.expect(j.total).to.eql(1); pm.expect(j.items[0].id).to.eql(Number(pm.collectionVariables.get(\"listing_id\"))); pm.expect(j.page_size).to.eql(5); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "09 GET /listings/{id} - Chi tiết tin (khách)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "auth": {
+          "type": "noauth"
+        },
+        "url": "{{api}}/listings/{{listing_id}}"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Mã trạng thái là 200\", function () { pm.response.to.have.status(200); });",
+              "pm.test(\"Tin đã duyệt\", function () { const j = pm.response.json(); pm.expect(j.status).to.eql(\"approved\"); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "10 PATCH /listings/{id} - Sửa tin (người bán; tin phụ tạo sẵn ở pre-request)",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{seller_token}}",
+              "type": "string"
+            }
+          ]
+        },
+        "url": "{{api}}/listings/{{extra_id}}",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"price\": 40000\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const api = pm.variables.replaceIn(\"{{base_url}}\") + \"/api/v1\";",
+              "pm.sendRequest({",
+              "  url: api + \"/listings\", method: \"POST\",",
+              "  header: { \"Content-Type\": \"application/json\", \"Authorization\": \"Bearer \" + pm.collectionVariables.get(\"seller_token\") },",
+              "  body: { mode: \"raw\", raw: JSON.stringify({ title: \"Tin phụ Postman \" + pm.collectionVariables.get(\"run_id\"), description: \"Tin phụ do Postman tạo để thử nghiệm.\", price: 30000, condition: \"good\", category_id: Number(pm.collectionVariables.get(\"category_id\")) }) }",
+              "}, (err, res) => { if (!err && res.code === 201) { pm.collectionVariables.set(\"extra_id\", res.json().id); } });"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Mã trạng thái là 200\", function () { pm.response.to.have.status(200); });",
+              "pm.test(\"Giá mới, vẫn chờ duyệt\", function () { const j = pm.response.json(); pm.expect(j.price).to.eql(40000); pm.expect(j.status).to.eql(\"pending\"); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "11 POST /moderation/listings/{id}/reject - Từ chối tin (moderator)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{mod_token}}",
+              "type": "string"
+            }
+          ]
+        },
+        "url": "{{api}}/moderation/listings/{{extra_id}}/reject",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"reason\": \"Ảnh không đúng với sản phẩm mô tả\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Mã trạng thái là 200\", function () { pm.response.to.have.status(200); });",
+              "pm.test(\"Đã từ chối kèm lý do\", function () { const j = pm.response.json(); pm.expect(j.status).to.eql(\"rejected\"); pm.expect(j.reject_reason).to.be.a(\"string\"); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "12 DELETE /listings/{id} - Xóa tin (người bán)",
+      "request": {
+        "method": "DELETE",
+        "header": [],
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{seller_token}}",
+              "type": "string"
+            }
+          ]
+        },
+        "url": "{{api}}/listings/{{extra_id}}"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Mã trạng thái là 204\", function () { pm.response.to.have.status(204); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "13 POST /listings/{id}/offers - Gửi đề nghị mua (người mua)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{buyer_token}}",
+              "type": "string"
+            }
+          ]
+        },
+        "url": "{{api}}/listings/{{listing_id}}/offers",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"amount\": 40000,\n  \"message\": \"Mình lấy được không bạn?\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Mã trạng thái là 201\", function () { pm.response.to.have.status(201); });",
+              "pm.test(\"Đang chờ\", function () { const j = pm.response.json(); pm.expect(j.status).to.eql(\"pending\"); });",
+              "pm.collectionVariables.set(\"offer_id\", pm.response.json().id);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "14 GET /offers/received - Đề nghị gửi tới tin của tôi (người bán)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{seller_token}}",
+              "type": "string"
+            }
+          ]
+        },
+        "url": "{{api}}/offers/received"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Mã trạng thái là 200\", function () { pm.response.to.have.status(200); });",
+              "pm.test(\"Có đề nghị vừa gửi\", function () { const j = pm.response.json(); pm.expect(j.items.map(o => o.id)).to.include(Number(pm.collectionVariables.get(\"offer_id\"))); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "15 POST /offers/{id}/accept - Chấp nhận đề nghị (người bán)",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{seller_token}}",
+              "type": "string"
+            }
+          ]
+        },
+        "url": "{{api}}/offers/{{offer_id}}/accept"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Mã trạng thái là 200\", function () { pm.response.to.have.status(200); });",
+              "pm.test(\"Đề nghị accepted, tin sold\", function () { const j = pm.response.json(); pm.expect(j.status).to.eql(\"accepted\"); pm.expect(j.listing.status).to.eql(\"sold\"); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "16 POST /offers/{id}/review - Đánh giá người bán (người mua)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{buyer_token}}",
+              "type": "string"
+            }
+          ]
+        },
+        "url": "{{api}}/offers/{{offer_id}}/review",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"rating\": 5,\n  \"comment\": \"Giao dịch nhanh gọn.\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Mã trạng thái là 201\", function () { pm.response.to.have.status(201); });",
+              "pm.test(\"Điểm 5 sao\", function () { const j = pm.response.json(); pm.expect(j.rating).to.eql(5); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "17 GET /users/{id} - Hồ sơ và điểm uy tín người bán (khách)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "auth": {
+          "type": "noauth"
+        },
+        "url": "{{api}}/users/{{seller_id}}"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Mã trạng thái là 200\", function () { pm.response.to.have.status(200); });",
+              "pm.test(\"Có điểm uy tín, không lộ email\", function () { const j = pm.response.json(); pm.expect(j.rating_avg).to.be.a(\"number\"); pm.expect(j).to.not.have.property(\"email\"); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "18 POST /listings/{id}/reports - Báo cáo tin vi phạm (người mua)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{buyer_token}}",
+              "type": "string"
+            }
+          ]
+        },
+        "url": "{{api}}/listings/{{listing_id}}/reports",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"reason_code\": \"spam\",\n  \"detail\": \"Tin đăng lặp lại nhiều lần.\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Mã trạng thái là 201\", function () { pm.response.to.have.status(201); });",
+              "pm.test(\"Báo cáo đang mở\", function () { const j = pm.response.json(); pm.expect(j.status).to.eql(\"open\"); });",
+              "pm.collectionVariables.set(\"report_id\", pm.response.json().id);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "19 PATCH /moderation/reports/{id} - Xử lý báo cáo (moderator)",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{mod_token}}",
+              "type": "string"
+            }
+          ]
+        },
+        "url": "{{api}}/moderation/reports/{{report_id}}",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"action\": \"dismiss\",\n  \"note\": \"Kiểm tra: không vi phạm.\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Mã trạng thái là 200\", function () { pm.response.to.have.status(200); });",
+              "pm.test(\"Đã bỏ qua báo cáo\", function () { const j = pm.response.json(); pm.expect(j.status).to.eql(\"dismissed\"); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "20 POST /listings/{id}/images - Upload ảnh (THỦ CÔNG: chọn file trước, bỏ tick khi chạy Runner)",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{seller_token}}",
+              "type": "string"
+            }
+          ]
+        },
+        "url": "{{api}}/listings/{{upload_id}}/images",
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            {
+              "key": "files",
+              "type": "file",
+              "src": []
+            }
+          ]
+        },
+        "description": "Tab Body → dòng files → Select files → chọn một ảnh .png/.jpg/.webp thật (≤ 5 MB). Tin để upload được tạo sẵn ở pre-request."
+      },
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const api = pm.variables.replaceIn(\"{{base_url}}\") + \"/api/v1\";",
+              "pm.sendRequest({",
+              "  url: api + \"/listings\", method: \"POST\",",
+              "  header: { \"Content-Type\": \"application/json\", \"Authorization\": \"Bearer \" + pm.collectionVariables.get(\"seller_token\") },",
+              "  body: { mode: \"raw\", raw: JSON.stringify({ title: \"Tin thử upload \" + pm.collectionVariables.get(\"run_id\"), description: \"Tin phụ do Postman tạo để thử nghiệm.\", price: 30000, condition: \"good\", category_id: Number(pm.collectionVariables.get(\"category_id\")) }) }",
+              "}, (err, res) => { if (!err && res.code === 201) { pm.collectionVariables.set(\"upload_id\", res.json().id); } });"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Mã trạng thái là 201\", function () { pm.response.to.have.status(201); });",
+              "pm.test(\"Có url /media/...\", function () { const j = pm.response.json(); pm.expect(j[0].url).to.match(/^\\/media\\/listings\\//); });"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}
