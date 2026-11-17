@@ -87,13 +87,18 @@ $('#fr').addEventListener('submit',async e=>{e.preventDefault();const f=e.target
 $('#fg').addEventListener('submit',async e=>{e.preventDefault();const f=e.target;err(f,'email','');
   const email=f.elements.email.value.trim();
   if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))return err(f,'email','Email không hợp lệ.');
-  await loginGoogle({name:f.elements.name.value.trim(),email});done('Đăng nhập bằng Google thành công.')});
+  const result=await loginGoogle({name:f.elements.name.value.trim(),email});
+  if(!result.ok)return err(f,'email',result.msg||'Đăng nhập Google chưa khả dụng.');
+  done('Đăng nhập bằng Google thành công.')});
 
 if(GOOGLE_CLIENT_ID){
   const s=document.createElement('script');s.src='https://accounts.google.com/gsi/client';s.async=true;
-  s.onload=()=>{google.accounts.id.initialize({client_id:GOOGLE_CLIENT_ID,callback:async r=>{const p=decodeJwt(r.credential);await loginGoogle({name:p.name,email:p.email});done('Đăng nhập bằng Google thành công.')}});
+  s.onload=()=>{google.accounts.id.initialize({client_id:GOOGLE_CLIENT_ID,callback:async r=>{const p=decodeJwt(r.credential);const result=await loginGoogle({name:p.name,email:p.email});if(result.ok)done('Đăng nhập bằng Google thành công.');else toast(result.msg)}});
     $('#gg').hidden=true;google.accounts.id.renderButton($('#gsi'),{theme:'outline',size:'large',width:380,text:'continue_with',locale:'vi'})};
   document.head.appendChild(s);
+}else{
+  $('#gg').hidden=true;
+  $('#gsi').hidden=true;
 }
 </script>
 </body>
