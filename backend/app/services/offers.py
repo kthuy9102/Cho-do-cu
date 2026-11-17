@@ -2,6 +2,7 @@
 import logging
 
 from sqlalchemy import select, update
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.exceptions import ConflictError, ForbiddenError, NotFoundError
@@ -33,7 +34,24 @@ def create_offer(db: Session, listing_id: int, buyer: User, payload: OfferCreate
 
     offer = Offer(listing_id=listing_id, buyer_id=buyer.id, amount=payload.amount, message=payload.message)
     db.add(offer)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        # Unique partial index là lớp bảo vệ cuối cùng trước hai request đồng thời.
+        db.rollback()
+        duplicate = db.scalar(
+            select(Offer.id).where(
+                Offer.listing_id == listing_id,
+                Offer.buyer_id == buyer.id,
+                Offer.status == OfferStatus.pending,
+            )
+        )
+        if duplicate:
+            raise ConflictError(
+                "Bạn đã có đề nghị đang chờ cho tin này, hãy hủy đề nghị cũ trước",
+                code="duplicate_offer",
+            ) from None
+        raise
     logger.info("offer_created", extra={"offer_id": offer.id, "listing_id": listing_id, "buyer_id": buyer.id})
     return offer
 

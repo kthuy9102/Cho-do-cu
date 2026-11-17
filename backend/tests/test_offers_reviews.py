@@ -1,6 +1,7 @@
 import pytest
+from sqlalchemy.exc import IntegrityError
 
-from app.models import Listing, ListingStatus
+from app.models import Listing, ListingStatus, Offer, OfferStatus
 
 API = "/api/v1"
 
@@ -58,6 +59,20 @@ def test_cannot_offer_on_sold_listing(client, alice, bob, category, make_listing
 def test_offer_validation(client, bob, listing, login, payload):
     response = client.post(f"{API}/listings/{listing.id}/offers", json=payload, headers=login(bob.email))
     assert response.status_code == 422
+
+
+def test_database_allows_only_one_pending_offer_per_buyer_listing(db, bob, listing):
+    db.add(Offer(listing_id=listing.id, buyer_id=bob.id, amount=40000))
+    db.commit()
+
+    # Các offer đã kết thúc vẫn được lưu để giữ lịch sử giao dịch.
+    db.add(Offer(listing_id=listing.id, buyer_id=bob.id, amount=41000, status=OfferStatus.rejected))
+    db.commit()
+
+    db.add(Offer(listing_id=listing.id, buyer_id=bob.id, amount=42000))
+    with pytest.raises(IntegrityError):
+        db.commit()
+    db.rollback()
 
 
 def test_duplicate_pending_offer_is_rejected_until_cancelled(client, bob, listing, login):
