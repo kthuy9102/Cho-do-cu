@@ -15,7 +15,8 @@ const ADMIN = {
     pw: 'Admin12345'
 };
 
-const AUTH_API = 'http://localhost:8001/api/v1';
+const AUTH_API = '/api/v1';
+const AUTH_API_BASE = ['5000', '5500'].includes(location.port) ? 'http://localhost:8001' + AUTH_API : AUTH_API;
 const AUTH_TOKEN_KEY = 'cdcsv_token';
 const AUTH_BUSER_KEY = 'cdcsv_buser';
 
@@ -125,7 +126,7 @@ function decodeJwt(t) {
 async function authFetchMe(tk) {
     for (const p of ['/users/me', '/auth/me']) {
         try {
-            const r = await fetch(AUTH_API + p, { headers: { Authorization: 'Bearer ' + tk } });
+            const r = await fetch(AUTH_API_BASE + p, { headers: { Authorization: 'Bearer ' + tk } });
             if (r.ok) return await r.json();
         } catch (e) {}
     }
@@ -143,7 +144,7 @@ async function login(email, pw) {
     let res;
 
     try {
-        res = await fetch(AUTH_API + '/auth/login', {
+        res = await fetch(AUTH_API_BASE + '/auth/login', {
             method: 'POST',
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
             body: new URLSearchParams({ username: email, password: pw })
@@ -220,7 +221,7 @@ async function register(v) {
     if (!v.agree) e.agree = 'Bạn cần đồng ý với điều khoản.';
     if (Object.keys(e).length) return { ok: false, errors: e };
 
-    const send = body => fetch(AUTH_API + '/auth/register', {
+    const send = body => fetch(AUTH_API_BASE + '/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body)
