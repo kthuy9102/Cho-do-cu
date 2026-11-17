@@ -1,4 +1,4 @@
-"""Nạp dữ liệu demo: 4 tài khoản (mỗi vai trò), danh mục và vài tin mẫu.
+"""Nạp dữ liệu demo: 4 tài khoản (mỗi vai trò), danh mục và 14 tin mẫu.
 
     python -m scripts.seed                  # chỉ nạp dữ liệu (bảng đã có do Alembic)
     python -m scripts.seed --create-tables  # tạo bảng bằng create_all rồi nạp (chỉ dùng khi dev)
@@ -19,12 +19,30 @@ DEMO_ACCOUNTS = [
     ("an@example.com", "Student123", "Nguyễn Văn An", Role.student),
     ("binh@example.com", "Student123", "Trần Thị Bình", Role.student),
 ]
-CATEGORIES = [("Giáo trình", "giao-trinh"), ("Đồ điện tử", "do-dien-tu"), ("Đồ dùng học tập", "do-dung-hoc-tap"), ("Quần áo", "quan-ao")]
+
+CATEGORIES = [
+    ("Giáo trình", "giao-trinh"),
+    ("Đồ điện tử", "do-dien-tu"),
+    ("Đồ dùng học tập", "do-dung-hoc-tap"),
+    ("Thời trang", "thoi-trang"),
+    ("Đồ gia dụng", "do-gia-dung"),
+]
+
 SAMPLE_LISTINGS = [
-    ("Giáo trình Giải tích 1", "Sách dùng một học kỳ, còn mới, không viết vẽ.", 45000, ItemCondition.like_new, "giao-trinh"),
-    ("Máy tính Casio fx-580VN X", "Còn bảo hành, kèm hộp và hướng dẫn sử dụng.", 320000, ItemCondition.good, "do-dien-tu"),
-    ("Tai nghe Bluetooth", "Pin dùng được khoảng 6 tiếng, có vài vết xước nhỏ.", 150000, ItemCondition.fair, "do-dien-tu"),
-    ("Bộ bút vẽ kỹ thuật", "Đủ 12 cây, dùng cho môn Vẽ kỹ thuật.", 60000, ItemCondition.good, "do-dung-hoc-tap"),
+    ("iPhone 11 64GB trắng", "Bản quốc tế 64GB, ngoại hình đẹp, pin ổn định.", 6200000, ItemCondition.good, "do-dien-tu"),
+    ("Giày MLB size 42", "Giày ít đi, đế còn mới 99%, đầy đủ hộp.", 850000, ItemCondition.like_new, "thoi-trang"),
+    ("Tai nghe không dây", "Kết nối Bluetooth nhạy, pin dùng liên tục 4-5 tiếng.", 420000, ItemCondition.good, "do-dien-tu"),
+    ("Giáo trình Giải tích 1", "Sách giáo trình đại cương, có ghi chú bài tập.", 45000, ItemCondition.fair, "giao-trinh"),
+    ("Macbook Air M1 2020", "RAM 8GB SSD 256GB, hoạt động mượt mà, kèm sạc zin.", 13500000, ItemCondition.good, "do-dien-tu"),
+    ("Bàn phím cơ Keychron K2", "Switch gõ êm, fullbox đầy đủ phụ kiện và cáp sạc.", 1200000, ItemCondition.like_new, "do-dien-tu"),
+    ("Áo khoác bomber đen", "Chất vải dày dặn, giữ ấm tốt, không xù lông.", 180000, ItemCondition.good, "thoi-trang"),
+    ("Nồi cơm điện mini 1L", "Nồi nhỏ gọn phù hợp cho 1-2 sinh viên ở trọ.", 150000, ItemCondition.good, "do-gia-dung"),
+    ("Bàn học gấp gọn", "Mặt gỗ chắc chắn, chân gấp gọn tiết kiệm diện tích.", 220000, ItemCondition.good, "do-gia-dung"),
+    ("Máy tính Casio fx-580VN X", "Máy chính hãng còn tem, phím bấm nảy, màn hình rõ.", 350000, ItemCondition.like_new, "do-dung-hoc-tap"),
+    ("Sách Lập trình Python cơ bản", "Sách hướng dẫn nhập môn Python cho sinh viên CNTT.", 60000, ItemCondition.good, "giao-trinh"),
+    ("Laptop Dell Inspiron 15", "Core i5, RAM 8GB, SSD 256GB, phù hợp học tập và văn phòng.", 7800000, ItemCondition.good, "do-dien-tu"),
+    ("Đèn học LED chống cận", "Đèn kẹp bàn 3 mức sáng, cổng sạc USB tiện lợi.", 90000, ItemCondition.like_new, "do-dung-hoc-tap"),
+    ("Balo laptop chống sốc", "Đựng vừa laptop 15.6 inch, nhiều ngăn chứa đồ.", 190000, ItemCondition.good, "do-dung-hoc-tap"),
 ]
 
 
@@ -32,11 +50,6 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--create-tables", action="store_true", help="tạo bảng bằng create_all (chỉ dùng khi dev)")
     parser.add_argument("--force", action="store_true", help="cho phép chạy khi ENVIRONMENT=production")
-    parser.add_argument(
-        "--reset-demo-admin",
-        action="store_true",
-        help="tạo hoặc đặt lại admin@example.com / Admin12345 (chỉ dùng môi trường dev)",
-    )
     args = parser.parse_args()
 
     if get_settings().environment == "production" and not args.force:
@@ -46,45 +59,9 @@ def main() -> int:
         Base.metadata.create_all(engine)
 
     with SessionLocal() as db:
-        existing_users = {user.email: user for user in db.query(User).all()}
-        if args.reset_demo_admin and existing_users:
-            email, password, name, role = DEMO_ACCOUNTS[0]
-            admin = existing_users.get(email)
-            if admin is None:
-                admin = User(email=email, full_name=name, role=role)
-                db.add(admin)
-                existing_users[email] = admin
-            admin.hashed_password = hash_password(password)
-            admin.full_name = name
-            admin.role = role
-            admin.is_active = True
-            db.commit()
-            print(f"Đã tạo/đặt lại tài khoản quản trị: {email}")
-        if existing_users:
-            # Database có thể đã có tài khoản sinh viên được tạo trước khi chạy seed.
-            # Bổ sung các tài khoản demo còn thiếu, tuyệt đối không ghi đè mật khẩu/vai trò
-            # của tài khoản đã tồn tại.
-            added = []
-            for email, password, name, role in DEMO_ACCOUNTS:
-                if email not in existing_users:
-                    db.add(
-                        User(
-                            email=email,
-                            hashed_password=hash_password(password),
-                            full_name=name,
-                            role=role,
-                        )
-                    )
-                    added.append(email)
-            db.commit()
-            if added:
-                print("Đã bổ sung tài khoản demo còn thiếu:")
-                for email in added:
-                    print(f"  {email}")
-            else:
-                print("Các tài khoản demo đã tồn tại; không thay đổi dữ liệu.")
+        if db.query(User).first() is not None:
+            print("Đã có dữ liệu, bỏ qua seed.")
             return 0
-
         users = {}
         for email, password, name, role in DEMO_ACCOUNTS:
             user = User(email=email, hashed_password=hash_password(password), full_name=name, role=role)
