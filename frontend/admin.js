@@ -648,7 +648,7 @@ adminLogout = function () { logout(); admState = 0; };
 async function admFetch(path, opt = {}) {
   const h = { Authorization: 'Bearer ' + sessionStorage.getItem(AUTH_TOKEN_KEY) };
   if (opt.body) h['Content-Type'] = 'application/json';
-  const res = await fetch(AUTH_API + path, { ...opt, headers: h });
+  const res = await fetch(AUTH_API_BASE + path, { ...opt, headers: h });
   const data = await res.json().catch(() => null);
   if (res.status === 401) {
     sessionStorage.removeItem(AKEY); sessionStorage.removeItem(AUTH_TOKEN_KEY);
@@ -661,7 +661,7 @@ async function admFetch(path, opt = {}) {
 const ADM_COND = { like_new: 0, good: 1, fair: 2 };
 function admMap(x) {
   const p = x.thumbnail_url || (x.images && x.images[0] && (x.images[0].url || x.images[0].image_url));
-  const origin = AUTH_API.replace('/api/v1', '');
+  const origin = AUTH_API_BASE.replace('/api/v1', '');
   return {
     id: x.id, t: x.title, p: x.price,
     c: Math.max(0, admCats.indexOf(x.category && x.category.id)),
@@ -690,7 +690,13 @@ async function admLoad() {
         if (x.seller) U[x.seller.id] = { n: x.seller.full_name, h: '' };
       });
     }
-    L = all; RP = [];
+    L = all;
+    const reports = await admFetch('/moderation/reports?status=open&page_size=100');
+    RP = (reports.items || []).map(x => {
+      if (x.reporter) U[x.reporter.id] = { n: x.reporter.full_name, h: '' };
+      if (x.listing && x.listing.seller) U[x.listing.seller.id] = { n: x.listing.seller.full_name, h: '' };
+      return { id: x.id, l: x.listing.id, f: x.reporter.id, x: x.detail || x.reason_code, open: x.status === 'open' };
+    });
   } catch (e) { toast(e.message); }
   admState = 2; render();
 }
@@ -712,6 +718,19 @@ async function admAct(path, body, okMsg) {
   } catch (e) { toast(e.message); }
   admState = 0; render();
 }
+
+resolve = async function (id, hide) {
+  const note = hide ? 'Đã xác nhận vi phạm và ẩn tin đăng.' : 'Báo cáo đã được kiểm tra và bỏ qua.';
+  try {
+    await admFetch('/moderation/reports/' + id, {
+      method: 'PATCH',
+      body: JSON.stringify({ action: hide ? 'hide_listing' : 'dismiss', note })
+    });
+    toast(hide ? 'Đã ẩn tin vi phạm.' : 'Đã bỏ qua báo cáo.');
+  } catch (e) { toast(e.message); }
+  admState = 0;
+  render();
+};
 
 setSt = function (id, st) {
   const l = L.find(x => x.id === id);
@@ -739,20 +758,6 @@ doReject = function (id) {
 };
 
 render();
-
-/* ===== TỰ CẬP NHẬT DANH SÁCH (2 giây) ===== */
-let syncing = false;
-async function autoSync() {
-  if (!ADM() || syncing || document.hidden) return;
-  const d = $('#dlg');
-  if (d && d.open) return;
-  syncing = true;
-  try { await loadAdmin(); $('#app').innerHTML = dash(); } catch (e) {}
-  finally { syncing = false; }
-}
-setInterval(autoSync, 2000);
-document.addEventListener('visibilitychange', () => { if (!document.hidden) autoSync(); });
-
 
 /* ===== TỰ LÀM MỚI DANH SÁCH ===== */
 let admBusy = false;

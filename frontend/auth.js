@@ -155,8 +155,15 @@ async function login(email, pw) {
     }
 
     if (!res.ok) {
-        console.warn('Backend trả về:', res.status, await res.text());
-        return authLoginLocal(email, pw);
+        const detail = await res.text();
+        console.warn('Backend trả về:', res.status, detail);
+        return {
+            ok: false,
+            field: 'pw',
+            msg: res.status === 401
+                ? 'Email hoặc mật khẩu không đúng.'
+                : 'Đăng nhập thất bại (HTTP ' + res.status + ').'
+        };
     }
 
     try {
