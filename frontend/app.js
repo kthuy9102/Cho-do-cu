@@ -641,3 +641,6 @@ async function autoSync() {
 }
 setInterval(autoSync, 30000);
 document.addEventListener('visibilitychange', () => { if (!document.hidden) autoSync(); });
+
+// Backend hiện chỉ hỗ trợ tạo và đọc đánh giá; không giả lập sửa đánh giá ở local.
+editReview = function () { toast('Backend hiện chưa cung cấp chức năng sửa đánh giá.'); };
