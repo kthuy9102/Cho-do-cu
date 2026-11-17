@@ -8,7 +8,7 @@ function save(){if(!saveData())toast('Bộ nhớ trình duyệt đầy, dữ li�
 function needLogin(){openDlg(`${dh('Cần đăng nhập')}<div class="db"><p style="margin:0">Hãy đăng nhập hoặc tạo tài khoản để tiếp tục.</p><div class="row"><a class="btn" style="flex:1;text-align:center" href="login.html#login">Đăng nhập</a><a class="btn o" style="flex:1;text-align:center" href="login.html#register">Đăng ký</a></div></div>`)}
 addEventListener('storage',e=>{if(e.key===KEY){const had=new Set(NOTI.map(x=>x.id));loadData();const fresh=NOTI.filter(x=>CUR&&x.to===me()&&!had.has(x.id));refresh();if(fresh.length)toast('🔔 '+fresh[fresh.length-1].t)}});
 const TAGS=[['Laptop','laptop'],['Sách','sach'],['Điện Thoại','dien thoai'],['Áo Khoác','ao khoac'],['Bàn Ghế','ban']];
-const DAILY=3;
+const DAILY=50;
 
 function toast(m){const t=$('#toast');t.textContent=m;t.style.display='block';clearTimeout(toast.h);toast.h=setTimeout(()=>t.style.display='none',3200)}
 function rep(u){const r=R.filter(x=>x.to===u);return r.length?{avg:(r.reduce((a,b)=>a+b.star,0)/r.length).toFixed(1),n:r.length}:null}
@@ -44,7 +44,7 @@ function setSort(v){S.sort=v;S.page=1;$('#fs').value=v;renderRes()}
 function search(){S.q=$('#q').value.trim();S.cat=+$('#fc').value;S.min=$('#fmin').value;S.max=$('#fmax').value;S.sort=$('#fs').value;S.page=1;if(S.view!=='home')go('home');else{renderRes();side()}}
 function fav(id,e){e.stopPropagation();if(!CUR)return needLogin();S.fav.has(id)?S.fav.delete(id):S.fav.add(id);renderRes();side()}
 
-function row(l,right,sub){return `<div class="ls"><div class="gr" onclick="openDetail(${l.id})">${''}<b>${esc(l.t)}</b><span class="mut">${vnd(l.p)} · ${esc(U[l.s].n)} · ${ago(l.a)}${sub||''}</span></div>${right}</div>`.replace('<div class="gr"',`<div class="gr"`)}
+function row(l,right,sub){return `<div class="ls"><div class="gr" onclick="openDetail(${l.id})">${''}<b>${esc(l.t)}</b><span class="mut">${vnd(l.p)} · ${esc(nm(l.s))} · ${ago(l.a)}${sub||''}</span></div>${right}</div>`.replace('<div class="gr"',`<div class="gr"`)}
 const stB=l=>({pending:'<span class="badge w">Chờ duyệt</span>',approved:'<span class="badge">Đang bán</span>',sold:'<span class="badge">Đã bán</span>',hidden:'<span class="badge x">Bị ẩn</span>'}[l.st]);
 function mineHtml(){
  const a=L.filter(l=>l.s===me()),b=O.filter(o=>o.f===me());
@@ -61,7 +61,7 @@ function gal(id,d){S.g+=d;$('#galw').innerHTML=galHtml(L.find(x=>x.id===id))}
 function openDetail(id){const l=L.find(x=>x.id===id);S.g=0;const mine=!!CUR&&l.s===me(),m=me(),offs=O.filter(o=>o.l===id),ods=ORD.filter(o=>o.l===id&&o.st!=='cancelled');
  let act='';
  if(!CUR)act=`<div class="box"><b>Đăng nhập để mua sản phẩm hoặc lưu tin</b><a class="btn" href="login.html#login">Đăng nhập</a></div>`;
- else if(mine)act=`<div class="box"><b>Đề nghị trả giá (${offs.length})</b>${offs.length?offs.map(o=>`<div class="sel" style="align-items:flex-start"><div style="flex:1"><b>${esc(U[o.f].n)} · ${vnd(o.p)}</b><div class="mut" style="white-space:pre-line;margin-top:4px">${esc(o.m||'Không có lời nhắn')}</div></div>${o.st==='pending'&&l.st==='approved'?`<button class="btn sm" onclick="accept(${o.id})">Chấp nhận</button><button class="btn sm o" onclick="rejectO(${o.id})">Từ chối</button>`:`<span class="badge ${o.st==='rejected'?'x':''}">${{pending:'Chờ',accepted:'Đã chấp nhận',rejected:'Đã từ chối'}[o.st]}</span>`}</div>`).join(''):'<span class="mut">Chưa có ai gửi đề nghị trả giá.</span>'}</div>${ods.length?`<div class="box"><b>Đơn hàng của tin này</b>${ods.map(o=>`<div class="sel"><div style="flex:1"><b>#${o.code} · ${esc(o.name)}</b><div class="mut">${vnd(o.p)} · ${OST[o.st][0]}</div></div></div>`).join('')}<button class="btn" onclick="openOrders('sell')">Quản lý đơn bán</button></div>`:''}`;
+ else if(mine)act=`<div class="box"><b>Đề nghị trả giá (${offs.length})</b>${offs.length?offs.map(o=>`<div class="sel" style="align-items:flex-start"><div style="flex:1"><b>${esc(nm(o.f))} · ${vnd(o.p)}</b><div class="mut" style="white-space:pre-line;margin-top:4px">${esc(o.m||'Không có lời nhắn')}</div></div>${o.st==='pending'&&l.st==='approved'?`<button class="btn sm" onclick="accept(${o.id})">Chấp nhận</button><button class="btn sm o" onclick="rejectO(${o.id})">Từ chối</button>`:`<span class="badge ${o.st==='rejected'?'x':''}">${{pending:'Chờ',accepted:'Đã chấp nhận',rejected:'Đã từ chối'}[o.st]}</span>`}</div>`).join(''):'<span class="mut">Chưa có ai gửi đề nghị trả giá.</span>'}</div>${ods.length?`<div class="box"><b>Đơn hàng của tin này</b>${ods.map(o=>`<div class="sel"><div style="flex:1"><b>#${o.code} · ${esc(o.name)}</b><div class="mut">${vnd(o.p)} · ${OST[o.st][0]}</div></div></div>`).join('')}<button class="btn" onclick="openOrders('sell')">Quản lý đơn bán</button></div>`:''}`;
  else if(l.st==='approved'){const mo=offs.find(o=>o.f===m);
   act=`<div class="box"><b>Mua sản phẩm / Gửi đề nghị</b>${mo?`<div><span class="badge w">Bạn đã gửi đề nghị giá ${vnd(mo.p)}. Chờ người bán phản hồi.</span><div class="mut" style="white-space:pre-line;margin-top:6px">${esc(mo.m)}</div></div>`:`
   <div class="row" style="margin-bottom:8px">
@@ -75,7 +75,7 @@ function openDetail(id){const l=L.find(x=>x.id===id);S.g=0;const mine=!!CUR&&l.s
  openDlg(`${dh(esc(l.t))}<div class="db"><div id="galw">${galHtml(l)}</div>
  <div><div class="pr" style="font-size:22px">${vnd(l.p)}</div><div class="mut">${stB(l)} ${CATS[l.c][0]} · ${CONDS[l.k]} · ${ago(l.a)}</div></div>
  <p style="margin:0">${esc(l.ds)}</p>
- <div class="sel"><div class="av">${U[l.s].n[0]}</div><div><b>${esc(U[l.s].n)}</b><div class="mut">${repTxt(l.s)}</div></div></div>${act}</div>`)}
+ <div class="sel"><div class="av">${nm(l.s)[0]}</div><div><b>${esc(nm(l.s))}</b><div class="mut">${repTxt(l.s)}</div></div></div>${act}</div>`)}
 
 // ===== ĐƠN HÀNG =====
 const OST={pending:['Chờ xác nhận','w'],confirmed:['Đã xác nhận',''],shipping:['Đang giao',''],done:['Hoàn tất',''],cancelled:['Đã hủy','x']};
@@ -138,10 +138,10 @@ function openBuyForm(id){
  openDlg(`${dh('Thông tin đặt mua & nhận hàng')}<div class="db">
   <div class="sel" style="background:var(--bg);padding:10px;border-radius:8px">
    <div style="flex:1"><b>${esc(l.t)}</b><div class="pr">${vnd(l.p)}</div></div>
-   <span class="mut">Người bán: ${esc(U[l.s].n)}</span>
+   <span class="mut">Người bán: ${esc(nm(l.s))}</span>
   </div>
   <div class="two">
-   <label class="f" id="bf_name">Tên người nhận *<input id="bname" maxlength="60" value="${esc(U[m].n)}"><span class="err"></span></label>
+   <label class="f" id="bf_name">Tên người nhận *<input id="bname" maxlength="60" value="${esc(nm(m))}"><span class="err"></span></label>
    <label class="f" id="bf_phone">Số điện thoại *<input id="bphone" type="tel" maxlength="15" placeholder="09xxxxxxxx" value="${esc(CUR.phone||'')}"><span class="err"></span></label>
   </div>
   <label class="f" id="bf_addr">Địa chỉ giao hàng / Điểm hẹn nhận đồ *<input id="baddr" maxlength="200" placeholder="VD: Cổng chính trường, KTX nhà A3, hoặc số nhà..."><span class="err"></span></label>
@@ -190,7 +190,7 @@ function accept(oid){const o=O.find(x=>x.id===oid),l=L.find(x=>x.id===o.l);
  if(l.st!=='approved')return toast('Tin này không còn ở trạng thái đang bán.');
  const now=Date.now(),bu=getUsers().find(u=>u.id===o.f)||{},pay='Gặp trực tiếp tại trường / Kiểm tra hàng rồi trả tiền';
  l.st='sold';O.forEach(x=>{if(x.l===o.l)x.st=x.id===oid?'accepted':'rejected'});
- ORD.push({id:ORD.length+1,code:newCode(),l:o.l,b:o.f,s:l.s,p:o.p,name:bu.name||U[o.f].n,phone:bu.phone||'',addr:'Hẹn gặp trực tiếp với người bán',pay,note:o.m||'',st:'confirmed',ts:{pending:now,confirmed:now},eta:etaFor(pay,now)});
+ ORD.push({id:ORD.length+1,code:newCode(),l:o.l,b:o.f,s:l.s,p:o.p,name:bu.name||nm(o.f),phone:bu.phone||'',addr:'Hẹn gặp trực tiếp với người bán',pay,note:o.m||'',st:'confirmed',ts:{pending:now,confirmed:now},eta:etaFor(pay,now)});
  notify(o.f,`${nm(l.s)} đã chấp nhận đề nghị ${vnd(o.p)} cho "${l.t}". Đơn hàng đã được tạo`,'orders:buy','✅');
  toast('Đã chấp nhận đề nghị. Đơn hàng đã được tạo, xem ở mục Đơn hàng.');openDetail(o.l);refresh(true)}
 function rejectO(oid){const o=O.find(x=>x.id===oid);o.st='rejected';notify(o.f,`Đề nghị ${vnd(o.p)} của bạn cho "${(L.find(x=>x.id===o.l)||{t:'sản phẩm'}).t}" bị từ chối`,'mine','❌');toast('Đã từ chối đề nghị.');openDetail(o.l);refresh(true)}
@@ -220,7 +220,12 @@ function submitPost(){const bad=(id,m)=>{const f=$('#'+id);f.classList.add('bad'
  L.push({id:L.length+1,t,p,c:+c,k:+$('#pk').value,s:me(),a:0,n:pics.length,im:pics.slice(),st:'pending',e:CATS[+c][1],ds:$('#pd').value.trim()||'Không có mô tả.'});
  notify(me(),`Tin "${t}" đã được gửi, đang chờ kiểm duyệt`,'mine','📝');
  $('#dlg').close();toast('Đã gửi tin. Tin sẽ hiển thị sau khi kiểm duyệt viên duyệt.');go('mine')}
-function side(){const u=CUR?U[me()]:{n:'Khách',h:'Chưa đăng nhập'},ini=u.n[0];$('#pn').textContent=u.n;$('#ph').textContent=u.h;
+function side(){
+ const u=CUR
+  ?(U[me()]||(U[me()]={n:CUR.name||CUR.email||'Bạn',h:'@'+String(CUR.email||'').split('@')[0]}))
+  :{n:'Khách',h:'Chưa đăng nhập'},
+  ini=u.n[0];
+ $('#pn').textContent=u.n;$('#ph').textContent=u.h;
  ['pav','cav'].forEach(i=>$('#'+i).textContent=CUR?ini:'?');
  $('#cmpt').textContent=CUR?`${u.n} ơi, bạn cần bán gì hôm nay?`:'Đăng nhập để bắt đầu bán hàng';
  $('#who').innerHTML=CUR?bellHtml()+userMenu(u,ini):`<a class="btn o sm" href="login.html#login">Đăng nhập</a><a class="btn sm" href="login.html#register">Đăng ký</a>`;
@@ -232,7 +237,8 @@ function side(){const u=CUR?U[me()]:{n:'Khách',h:'Chưa đăng nhập'},ini=u.n
  $('#cats').innerHTML=CATS.map((c,i)=>`<button class="cat ${S.cat===i?'on':''}" onclick="pickCat(${i})"><span>${c[1]}</span><span>${c[0]}</span><em>${vis.filter(l=>l.c===i).length}</em></button>`).join('');
  $('#s1').textContent='+'+vis.filter(l=>l.a===0).length;
  $('#trend').innerHTML=[['#Macbook','2.1k','macbook'],['#Bàn phím cơ','1.8k','ban phim'],['#Điện thoại','1.5k','dien thoai'],['#Laptop','1.2k','laptop'],['#Tai nghe','980','tai nghe']].map((t,i)=>`<button class="tr" onclick="tag('${t[2]}')"><i style="color:${['#d98a0b','#e0883e','#c9a400','inherit','inherit'][i]}">${i+1}</i><span>${t[0]}</span><span class="mut" style="flex:none">${t[1]}</span></button>`).join('');
- $('#hot').innerHTML=CATS.slice(0,4).map((c,i)=>`<button class="chip" onclick="pickCat(${i})">${c[0]}</button>`).join('')}
+ $('#hot').innerHTML=CATS.slice(0,4).map((c,i)=>`<button class="chip" onclick="pickCat(${i})">${c[0]}</button>`).join('')
+}
 function pickCat(i){S.cat=S.cat===i?-1:i;$('#fc').value=S.cat;S.page=1;if(S.view!=='home')go('home');else{renderRes();side()}}
 function tag(k){$('#q').value=k;search()}
 function go(v){if(location.hash!=='#'+v)location.hash=v;else route()}
@@ -281,7 +287,7 @@ function saveProfile(){
  $('#dlg').close();toast('Đã cập nhật thông tin tài khoản.');refresh(true)}
 
 // ===== THÔNG BÁO (chuông) =====
-function nm(id){return U[id]?U[id].n:'Người dùng'}
+function nm(id){return U[id]?U[id].n:(CUR&&id===me()?(CUR.name||CUR.email||'Bạn'):'Người dùng')}
 function timeAgo(t){const m=Math.floor((Date.now()-t)/6e4);return m<1?'Vừa xong':m<60?m+' phút trước':m<1440?Math.floor(m/60)+' giờ trước':Math.floor(m/1440)+' ngày trước'}
 function bellHtml(){const mine=NOTI.filter(x=>x.to===me()).sort((a,b)=>b.ts-a.ts).slice(0,20),n=mine.filter(x=>!x.read).length;
  return `<div class="bl"><button class="blb" id="blb" aria-label="Thông báo${n?' ('+n+' chưa đọc)':''}" aria-haspopup="true" aria-expanded="false" onclick="toggleBell()"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"/></svg>${n?`<i class="bdg">${n>9?'9+':n}</i>`:''}</button>
@@ -447,7 +453,7 @@ function submitRv() {
   const x = $('#rvx').value.trim();
   let e = 0;
   if (!RV.star) e += bad('rvf1', 'Vui lòng chọn số sao từ 1 đến 5.');
-  if (x.length < 10) e += bad('rvf2', 'Nhận xét cần ít nhất 10 ký tự.');
+  if (x.length < 3) e += bad('rvf2', 'Nhận xét cần ít nhất 3 ký tự.');
   if (e) return;
   if (!canReview(l)) return toast('Bạn không thể đánh giá giao dịch này (403).');
   R.push({ l: l.id, to: l.s, f: me(), star: RV.star, x, t: Date.now() });
@@ -538,3 +544,68 @@ reviewsHtml = function (sid, lid) {
   if (!rs.length) return '<div class="mut">Sản phẩm này chưa có đánh giá nào.</div>';
   return rs.map(r => `<div class="rvl"><div><span class="stars">${'★'.repeat(r.star)}${'☆'.repeat(5 - r.star)}</span> <b>${esc(nm(r.f))}</b>${r.ed ? ' <span class="mut">· đã chỉnh sửa</span>' : ''}</div><div class="mut">${esc(r.x)}</div></div>`).join('');
 };
+
+/* ===== ĐĂNG TIN LƯU VÀO BACKEND ===== */
+let picFiles = [];
+let posting = false;
+
+const _openPost = openPost;
+openPost = function () { picFiles = []; _openPost(); };
+
+pickImgs = function (inp) {
+  const fs = [...inp.files].slice(0, 5);
+  picFiles = fs; pics = [];
+  $('#th').innerHTML = '';
+  fs.forEach(f => {
+    const r = new FileReader();
+    r.onload = () => { pics.push(r.result); $('#th').insertAdjacentHTML('beforeend', `<img src="${r.result}" alt="">`); };
+    r.readAsDataURL(f);
+  });
+};
+
+submitPost = async function () {
+  const bad = (id, m) => { const f = $('#' + id); f.classList.add('bad'); f.querySelector('.err').textContent = m; return 1; };
+  ['pt', 'pp', 'pc', 'pi'].forEach(i => { $('#' + i).classList.remove('bad'); $('#' + i).querySelector('.err').textContent = ''; });
+  const t = $('#pti').value.trim(), p = +$('#ppr').value, c = $('#pca').value;
+  let e = 0;
+  if (t.length < 5) e += bad('pt', 'Tiêu đề cần ít nhất 5 ký tự.');
+  if (!Number.isInteger(p) || p < 1000) e += bad('pp', 'Giá phải là số nguyên từ 1.000đ trở lên.');
+  if (c === '') e += bad('pc', 'Hãy chọn danh mục.');
+  if (!picFiles.length) e += bad('pi', 'Cần ít nhất 1 ảnh.');
+  if (e || posting) return;
+  if (!getToken()) { alert('Bạn cần đăng nhập (hoặc đăng ký tài khoản mới) để đăng tin.'); location.href = 'login.html#login'; return; }
+  posting = true;
+  try {
+    const body = {
+      title: t, price: p, category_id: CAT_IDS[+c],
+      condition: ['like_new', 'good', 'fair'][+$('#pk').value] || 'good',
+      description: $('#pd').value.trim() || 'Không có mô tả.'
+    };
+    const created = await api('/listings', { method: 'POST', body: JSON.stringify(body) });
+    const fd = new FormData();
+    picFiles.forEach(f => fd.append('files', f));
+    await api(`/listings/${created.id}/images`, { method: 'POST', body: fd });
+    await loadFromApi();
+    $('#dlg').close();
+    toast('Đã gửi tin. Tin sẽ hiển thị sau khi kiểm duyệt viên duyệt.');
+    go('mine');
+  } catch (err) {
+    alert('Lỗi đăng tin: ' + (err.message || err));
+  } finally { posting = false; }
+};
+
+
+
+
+/* ===== TỰ CẬP NHẬT DỮ LIỆU TỪ BACKEND (2 giây) ===== */
+let syncing = false;
+async function autoSync() {
+  if (syncing || document.hidden || posting) return;
+  const d = $('#dlg');
+  if (d && d.open) return;              // đang mở hộp thoại thì không làm phiền
+  syncing = true;
+  try { await loadFromApi(); refresh(); } catch (e) { /* lần sau thử lại */ }
+  finally { syncing = false; }
+}
+setInterval(autoSync, 2000);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) autoSync(); });
