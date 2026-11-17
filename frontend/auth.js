@@ -10,13 +10,8 @@ const AUTH_API = AUTH_API_ORIGIN + "/api/v1";
 const AUTH_TOKEN_KEY = "cdcsv_token";
 const AUTH_BUSER_KEY = "cdcsv_buser";
 
-function getUsers() {
-  try { return JSON.parse(localStorage.getItem(UKEY) || "[]"); }
-  catch { return []; }
-}
-function putUsers(users) {
-  localStorage.setItem(UKEY, JSON.stringify(users));
-}
+function getUsers() { return []; }
+function putUsers() {}
 function session() {
   try {
     const user = localStorage.getItem(AUTH_BUSER_KEY);
