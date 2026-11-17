@@ -8,7 +8,7 @@ function save(){if(!saveData())toast('Bộ nhớ trình duyệt đầy, dữ li�
 function needLogin(){openDlg(`${dh('Cần đăng nhập')}<div class="db"><p style="margin:0">Hãy đăng nhập hoặc tạo tài khoản để tiếp tục.</p><div class="row"><a class="btn" style="flex:1;text-align:center" href="login.html#login">Đăng nhập</a><a class="btn o" style="flex:1;text-align:center" href="login.html#register">Đăng ký</a></div></div>`)}
 addEventListener('storage',e=>{if(e.key===KEY){const had=new Set(NOTI.map(x=>x.id));loadData();const fresh=NOTI.filter(x=>CUR&&x.to===me()&&!had.has(x.id));refresh();if(fresh.length)toast('🔔 '+fresh[fresh.length-1].t)}});
 const TAGS=[['Laptop','laptop'],['Sách','sach'],['Điện Thoại','dien thoai'],['Áo Khoác','ao khoac'],['Bàn Ghế','ban']];
-const DAILY=50;
+const DAILY=5;
 
 function toast(m){const t=$('#toast');t.textContent=m;t.style.display='block';clearTimeout(toast.h);toast.h=setTimeout(()=>t.style.display='none',3200)}
 function rep(u){const r=R.filter(x=>x.to===u);return r.length?{avg:(r.reduce((a,b)=>a+b.star,0)/r.length).toFixed(1),n:r.length}:null}
