@@ -4,7 +4,7 @@ const SKEY = "cdcsv_session";
 const AKEY = "cdcsv_admin";
 const GOOGLE_CLIENT_ID = "";
 const AUTH_API_ORIGIN = location.port === "5500"
-  ? \`\${location.protocol}//\${location.hostname}:8001\`
+  ? location.protocol + "//" + location.hostname + ":8001"
   : "";
 const AUTH_API = AUTH_API_ORIGIN + "/api/v1";
 const AUTH_TOKEN_KEY = "cdcsv_token";
@@ -77,7 +77,6 @@ async function register(values) {
     return { ok: false, errors: { email: apiErrorMessage(data, "Không thể tạo tài khoản.") } };
   }
 
-  // API đăng ký không tự cấp token: đăng nhập ngay bằng tài khoản vừa tạo.
   const loginResult = await login(email, values.pw);
   if (!loginResult.ok) {
     return { ok: false, errors: { pw: "Tạo tài khoản thành công nhưng đăng nhập tự động thất bại. Hãy đăng nhập lại." } };
@@ -118,7 +117,6 @@ async function login(email, password) {
     console.warn("Backend trả về", response.status, data);
     return { ok: false, field: "pw", msg: apiErrorMessage(data, "Email hoặc mật khẩu không đúng.") };
   }
-
   if (!data.access_token || !data.user) {
     console.error("Phản hồi login thiếu access_token hoặc user:", data);
     return { ok: false, field: "pw", msg: "Phản hồi đăng nhập từ máy chủ không hợp lệ." };
