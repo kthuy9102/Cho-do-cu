@@ -67,24 +67,45 @@ $('#dlg').addEventListener('click',e=>{if(e.target.id==='dlg')e.target.close()})
 const dh=t=>`<div class="dh">${t}<button aria-label="Đóng" onclick="$('#dlg').close()">×</button></div>`;
 function galHtml(l){const n=l.im?l.im.length:l.n;S.g=(S.g+n)%n;return `<div class="gal" style="--h:${l.id*47%360}">${l.im?`<img src="${l.im[S.g]}" alt="">`:`<span>${l.e}</span>`}${n>1?`<button class="pv" aria-label="Ảnh trước" onclick="gal(${l.id},-1)">‹</button><button class="nx" aria-label="Ảnh sau" onclick="gal(${l.id},1)">›</button>`:''}<b class="cnt">${S.g+1}/${n}</b></div>`}
 function gal(id,d){S.g+=d;$('#galw').innerHTML=galHtml(L.find(x=>x.id===id))}
-function openDetail(id){const l=L.find(x=>x.id===id);S.g=0;const mine=!!CUR&&l.s===me(),m=me(),offs=O.filter(o=>o.l===id),ods=ORD.filter(o=>o.l===id&&o.st!=='cancelled');
- let act='';
- if(!CUR)act=`<div class="box"><b>Đăng nhập để mua sản phẩm hoặc lưu tin</b><a class="btn" href="login.html#login">Đăng nhập</a></div>`;
- else if(mine)act=`<div class="box"><b>Đề nghị trả giá (${offs.length})</b>${offs.length?offs.map(o=>`<div class="sel" style="align-items:flex-start"><div style="flex:1"><b>${esc(U[o.f].n)} · ${vnd(o.p)}</b><div class="mut" style="white-space:pre-line;margin-top:4px">${esc(o.m||'Không có lời nhắn')}</div></div>${o.st==='pending'&&l.st==='approved'?`<button class="btn sm" onclick="accept(${o.id})">Chấp nhận</button><button class="btn sm o" onclick="rejectO(${o.id})">Từ chối</button>`:`<span class="badge ${o.st==='rejected'?'x':''}">${{pending:'Chờ',accepted:'Đã chấp nhận',rejected:'Đã từ chối'}[o.st]}</span>`}</div>`).join(''):'<span class="mut">Chưa có ai gửi đề nghị trả giá.</span>'}</div>${ods.length?`<div class="box"><b>Đơn hàng của tin này</b>${ods.map(o=>`<div class="sel"><div style="flex:1"><b>#${o.code} · ${esc(o.name)}</b><div class="mut">${vnd(o.p)} · ${OST[o.st][0]}</div></div></div>`).join('')}<button class="btn" onclick="openOrders('sell')">Quản lý đơn bán</button></div>`:''}`;
- else if(l.st==='approved'){const mo=offs.find(o=>o.f===m);
-  act=`<div class="box"><b>Mua sản phẩm / Gửi đề nghị</b>${mo?`<div><span class="badge w">Bạn đã gửi đề nghị giá ${vnd(mo.p)}. Chờ người bán phản hồi.</span><div class="mut" style="white-space:pre-line;margin-top:6px">${esc(mo.m)}</div></div>`:`
-  <div class="row" style="margin-bottom:8px">
-    <button class="btn" style="flex:1" onclick="openBuyForm(${id})">⚡ Mua ngay (${vnd(l.p)})</button>
-  </div>
-  <div class="two"><label class="f" id="fp">Hoặc giá đề nghị (đ)<input id="op" type="number" min="1000" value="${l.p}"><span class="err" id="ep"></span></label><label class="f">Lời nhắn<input id="om" maxlength="120" placeholder="Hẹn gặp ở cổng trường..."></label></div>
-  <button class="btn o" onclick="offer(${id})">Gửi đề nghị trả giá</button>`}
-  <div class="row"><button class="btn o sm" onclick="fav(${id},event);openDetail(${id})">${S.fav.has(id)?'♥ Đã lưu':'♡ Lưu tin'}</button><button class="btn o sm" onclick="repForm(${id})">🚩 Báo cáo tin</button></div></div>`}
- else{const my=ods.find(o=>o.b===m);
-  act=my?`<div class="box" style="border-color:var(--g)"><b>🎉 Cảm ơn bạn đã đặt hàng!</b><div>Mã đơn <b>#${my.code}</b> · <span class="badge ${OST[my.st][1]}">${OST[my.st][0]}</span></div>${my.st==='done'?`<div class="mut">Bạn đã nhận hàng lúc ${fdt(my.ts.done)}.</div>`:`<div class="mut">🚚 Dự kiến giao: <b>${fd(my.eta)}</b></div>`}<div class="row"><button class="btn" style="flex:1" onclick="openOrders('buy')">Xem đơn hàng</button>${my.st==='done'&&!my.rv?`<button class="btn o" style="flex:1" onclick="reviewForm(${my.id})">★ Đánh giá người bán</button>`:''}</div></div>`:'<span class="mut">Tin này đã bán.</span>'}
+async function openDetail(id){
+ const l=L.find(x=>x.id===id);
+ if(!l)return;
+ try{
+  const detail=await api(`/listings/${id}`);
+  l.ds=detail.description||"";
+  const images=(detail.images||[]).map(item=>img(item.url)).filter(Boolean);
+  l.im=images.length?images:null;
+  l.n=images.length||1;
+  l.st=STMAP[detail.status]||detail.status;
+  l.rr=detail.reject_reason||"";
+  U[detail.seller.id]={...(U[detail.seller.id]||{}),n:detail.seller.full_name,h:""};
+ }catch(error){
+  console.warn("Không tải được chi tiết tin:",error);
+ }
+ S.g=0;
+ const mine=!!CUR&&l.s===me(),m=me(),offs=O.filter(o=>o.l===id);
+ let act="";
+ if(!CUR){
+  act=`<div class="box"><b>Đăng nhập để gửi đề nghị hoặc lưu tin</b><a class="btn" href="login.html#login">Đăng nhập</a></div>`;
+ }else if(mine){
+  act=`<div class="box"><b>Đề nghị trả giá (${offs.length})</b>${offs.length?offs.map(o=>`<div class="sel" style="align-items:flex-start"><div style="flex:1"><b>${esc(U[o.f]?.n||"Người mua")} · ${vnd(o.p)}</b><div class="mut" style="white-space:pre-line;margin-top:4px">${esc(o.m||"Không có lời nhắn")}</div></div>${o.st==="pending"&&l.st==="approved"?`<button class="btn sm" onclick="accept(${o.id})">Chấp nhận</button><button class="btn sm o" onclick="rejectO(${o.id})">Từ chối</button>`:`<span class="badge ${o.st==="rejected"||o.st==="cancelled"?"x":""}">${{pending:"Chờ",accepted:"Đã chấp nhận",rejected:"Đã từ chối",cancelled:"Đã hủy"}[o.st]||o.st}</span>`}</div>`).join(""):'<span class="mut">Chưa có ai gửi đề nghị trả giá.</span>'}</div>`;
+ }else if(l.st==="approved"){
+  const pending=offs.find(o=>o.f===m&&o.st==="pending");
+  act=`<div class="box"><b>Gửi đề nghị mua</b>${pending?`<div><span class="badge w">Bạn đã đề nghị ${vnd(pending.p)}. Chờ người bán phản hồi.</span><div class="mut" style="white-space:pre-line;margin-top:6px">${esc(pending.m)}</div></div>`:`
+  <div class="two"><label class="f" id="fp">Giá đề nghị (đ)<input id="op" type="number" min="1000" value="${l.p}"><span class="err" id="ep"></span></label><label class="f">Lời nhắn<input id="om" maxlength="500" placeholder="Hẹn gặp ở cổng trường..."></label></div>
+  <button class="btn" onclick="offer(${id})">Gửi đề nghị trả giá</button>`}
+  <div class="row"><button class="btn o sm" onclick="fav(${id},event);openDetail(${id})">${S.fav.has(id)?"♥ Đã lưu":"♡ Lưu tin"}</button><button class="btn o sm" onclick="repForm(${id})">🚩 Báo cáo tin</button></div></div>`;
+ }else{
+  const accepted=offs.find(o=>o.f===m&&o.st==="accepted");
+  const reviewed=R.some(review=>review.l===id&&review.f===m);
+  act=accepted?`<div class="box"><b>Đề nghị của bạn đã được người bán chấp nhận.</b><div class="mut">Tin đã chuyển sang trạng thái đã bán.</div>${reviewed?'<span class="badge">★ Bạn đã đánh giá người bán</span>':`<button class="btn" onclick="reviewForm(${accepted.id})">★ Đánh giá người bán</button>`}</div>`:'<div class="box"><span class="mut">Tin này đã bán hoặc không còn mở bán.</span></div>';
+ }
  openDlg(`${dh(esc(l.t))}<div class="db"><div id="galw">${galHtml(l)}</div>
- <div><div class="pr" style="font-size:22px">${vnd(l.p)}</div><div class="mut">${stB(l)} ${CATS[l.c][0]} · ${CONDS[l.k]} · ${ago(l.a)}</div></div>
+ <div><div class="pr" style="font-size:22px">${vnd(l.p)}</div><div class="mut">${stB(l)} ${CATS[l.c]?.[0]||"Danh mục"} · ${CONDS[l.k]||""} · ${ago(l.a)}</div></div>
  <p style="margin:0">${esc(l.ds)}</p>
- <div class="sel"><div class="av">${U[l.s].n[0]}</div><div><b>${esc(U[l.s].n)}</b><div class="mut">${repTxt(l.s)}</div></div></div>${act}</div>`)}
+ <div class="sel"><div class="av">${esc((U[l.s]?.n||"?")[0])}</div><div><b>${esc(U[l.s]?.n||"Người bán")}</b><div class="mut">${repTxt(l.s)}</div></div></div>${act}</div>`);
+}
+
 
 // ===== ĐƠN HÀNG =====
 const OST={pending:['Chờ xác nhận','w'],confirmed:['Đã xác nhận',''],shipping:['Đang giao',''],done:['Hoàn tất',''],cancelled:['Đã hủy','x']};
@@ -137,8 +158,18 @@ function setOrd(id,st,msg,who){const o=ORD.find(x=>x.id===id),now=Date.now();
   if(st==='cancelled'){if(who==='b')notify(o.s,`${nm(o.b)} đã hủy đơn #${o.code} (${tt})`,'orders:sell','❌');else notify(o.b,`Người bán đã từ chối đơn #${o.code} (${tt})`,'orders:buy','❌')}}
  toast(msg);refresh(true)}
 function reviewForm(oid){openDlg(`${dh('Đánh giá người bán')}<div class="db"><div class="two"><label class="f">Số sao<select id="ors"><option value="5">5 ★ Rất tốt</option><option value="4">4 ★ Tốt</option><option value="3">3 ★ Bình thường</option><option value="2">2 ★ Chưa tốt</option><option value="1">1 ★ Tệ</option></select></label><label class="f">Nhận xét<input id="orx" maxlength="200" placeholder="Giao hàng đúng hẹn, đồ đẹp..."></label></div><button class="btn" onclick="submitReview(${oid})">Gửi đánh giá</button></div>`)}
-function submitReview(oid){const o=ORD.find(x=>x.id===oid);if(!o||o.b!==me()||o.st!=='done'||o.rv)return toast('Không thể đánh giá đơn này.');
- R.push({l:o.l,to:o.s,f:me(),star:+$('#ors').value,x:$('#orx').value.trim()||'Không có nhận xét'});o.rv=true;notify(o.s,`${nm(me())} đã đánh giá bạn ${R[R.length-1].star} sao cho đơn #${o.code}`,'orders:sell','⭐');$('#dlg').close();toast('Cảm ơn bạn đã đánh giá người bán.');refresh(true)}
+async function submitReview(offerId){
+ const offerItem=O.find(item=>item.id===offerId);
+ if(!offerItem||offerItem.f!==me()||offerItem.st!=="accepted")return toast("Chỉ được đánh giá sau khi đề nghị được người bán chấp nhận.");
+ try{
+  await api(`/offers/${offerId}/review`,{method:"POST",body:JSON.stringify({rating:+$("#ors").value,comment:$("#orx").value.trim()||null})});
+  await loadFromApi();
+  $("#dlg").close();
+  toast("Cảm ơn bạn đã đánh giá người bán.");
+  refresh(true);
+ }catch(error){toast(error.message||"Không gửi được đánh giá.")}
+}
+
 
 // FORM ĐIỀN THÔNG TIN ĐẶT MUA & GIAO HÀNG
 function openBuyForm(id){
@@ -191,44 +222,105 @@ function submitBuy(id){
  refresh(true);
 }
 
-function offer(id){const p=+$('#op').value,f=$('#fp');if(!Number.isInteger(p)||p<1000){f.classList.add('bad');$('#ep').textContent='Giá phải là số nguyên từ 1.000đ trở lên.';return}
- const m=me();if(O.some(o=>o.l===id&&o.f===m)){toast('Bạn đã gửi đề nghị cho tin này.');return}
- O.push({id:O.length+1,l:id,f:m,p,m:$('#om').value.trim(),st:'pending'});{const lo=L.find(x=>x.id===id);notify(lo.s,`${nm(m)} đề nghị ${vnd(p)} cho "${lo.t}"`,'mine','💬')}toast('Đã gửi đề nghị. Chờ người bán phản hồi.');openDetail(id);refresh(true)}
-function accept(oid){const o=O.find(x=>x.id===oid),l=L.find(x=>x.id===o.l);
- if(!CUR||l.s!==me())return toast('Bạn không có quyền xử lý đề nghị này (403).');
- if(l.st!=='approved')return toast('Tin này không còn ở trạng thái đang bán.');
- const now=Date.now(),bu=getUsers().find(u=>u.id===o.f)||{},pay='Gặp trực tiếp tại trường / Kiểm tra hàng rồi trả tiền';
- l.st='sold';O.forEach(x=>{if(x.l===o.l)x.st=x.id===oid?'accepted':'rejected'});
- ORD.push({id:ORD.length+1,code:newCode(),l:o.l,b:o.f,s:l.s,p:o.p,name:bu.name||U[o.f].n,phone:bu.phone||'',addr:'Hẹn gặp trực tiếp với người bán',pay,note:o.m||'',st:'confirmed',ts:{pending:now,confirmed:now},eta:etaFor(pay,now)});
- notify(o.f,`${nm(l.s)} đã chấp nhận đề nghị ${vnd(o.p)} cho "${l.t}". Đơn hàng đã được tạo`,'orders:buy','✅');
- toast('Đã chấp nhận đề nghị. Đơn hàng đã được tạo, xem ở mục Đơn hàng.');openDetail(o.l);refresh(true)}
-function rejectO(oid){const o=O.find(x=>x.id===oid);o.st='rejected';notify(o.f,`Đề nghị ${vnd(o.p)} của bạn cho "${(L.find(x=>x.id===o.l)||{t:'sản phẩm'}).t}" bị từ chối`,'mine','❌');toast('Đã từ chối đề nghị.');openDetail(o.l);refresh(true)}
-function review(id){const l=L.find(x=>x.id===id);R.push({l:id,to:l.s,f:me(),star:+$('#rs').value,x:$('#rx').value.trim()||'Không có nhận xét'});toast('Cảm ơn bạn đã đánh giá người bán.');openDetail(id)}
-function repForm(id){openDlg(`${dh('Báo cáo tin vi phạm')}<div class="db"><label class="f">Lý do<select id="rr"><option>Lừa đảo hoặc nghi ngờ lừa đảo</option><option>Ảnh không đúng sản phẩm</option><option>Hàng cấm hoặc không phù hợp</option><option>Spam</option></select></label><button class="btn r" onclick="sendRep(${id})">Gửi báo cáo</button></div>`)}
-function sendRep(id){RP.push({id:RP.length+1,l:id,f:me(),x:$('#rr').value,open:true});$('#dlg').close();toast('Đã gửi báo cáo. Kiểm duyệt viên sẽ xem xét.');refresh(true)}
+async function offer(id){
+ const amount=+$("#op").value,field=$("#fp");
+ if(!Number.isInteger(amount)||amount<1000){field.classList.add("bad");$("#ep").textContent="Giá phải là số nguyên từ 1.000đ trở lên.";return}
+ try{
+  await api(`/listings/${id}/offers`,{method:"POST",body:JSON.stringify({amount,message:$("#om").value.trim()||null})});
+  await loadFromApi();
+  $("#dlg").close();
+  toast("Đã gửi đề nghị. Chờ người bán phản hồi.");
+  refresh(true);
+ }catch(error){toast(error.message||"Không gửi được đề nghị mua.")}
+}
+async function accept(offerId){
+ const offerItem=O.find(item=>item.id===offerId);
+ if(!offerItem)return toast("Không tìm thấy đề nghị mua.");
+ try{
+  await api(`/offers/${offerId}/accept`,{method:"POST"});
+  await loadFromApi();
+  toast("Đã chấp nhận đề nghị. Tin đã chuyển sang trạng thái đã bán.");
+  await openDetail(offerItem.l);
+  refresh(true);
+ }catch(error){toast(error.message||"Không thể chấp nhận đề nghị.")}
+}
+async function rejectO(offerId){
+ const offerItem=O.find(item=>item.id===offerId);
+ if(!offerItem)return toast("Không tìm thấy đề nghị mua.");
+ try{
+  await api(`/offers/${offerId}/reject`,{method:"POST"});
+  await loadFromApi();
+  toast("Đã từ chối đề nghị.");
+  await openDetail(offerItem.l);
+  refresh(true);
+ }catch(error){toast(error.message||"Không thể từ chối đề nghị.")}
+}
+function review(id){reviewForm(id)}
+function repForm(id){
+ openDlg(`${dh("Báo cáo tin vi phạm")}<div class="db"><label class="f">Lý do<select id="rr">
+ <option value="fraud">Lừa đảo hoặc nghi ngờ lừa đảo</option>
+ <option value="inappropriate">Nội dung không phù hợp</option>
+ <option value="prohibited_item">Hàng cấm hoặc không phù hợp</option>
+ <option value="spam">Spam</option>
+ <option value="other">Lý do khác</option>
+ </select></label><label class="f">Chi tiết (tuỳ chọn)<textarea id="rrd" rows="3" maxlength="1000"></textarea></label><button class="btn r" onclick="sendRep(${id})">Gửi báo cáo</button></div>`);
+}
+async function sendRep(id){
+ try{
+  await api(`/listings/${id}/reports`,{method:"POST",body:JSON.stringify({reason_code:$("#rr").value,detail:$("#rrd").value.trim()||null})});
+  $("#dlg").close();
+  toast("Đã gửi báo cáo. Kiểm duyệt viên sẽ xem xét.");
+ }catch(error){toast(error.message||"Không gửi được báo cáo.")}
+}
+
 
 let pics=[];
-function openPost(){if(!CUR)return needLogin();pics=[];
- openDlg(`${dh('Đăng tin bán')}<div class="db"><div class="mut">Hôm nay bạn đã đăng ${todayCount()}/${DAILY} tin. Tin cần kiểm duyệt viên duyệt trước khi hiển thị.</div>
- <label class="f" id="pt">Tiêu đề<input id="pti" maxlength="80" placeholder="Ví dụ: Giáo trình Vật lý đại cương"><span class="err"></span></label>
- <div class="two"><label class="f" id="pp">Giá (đ)<input id="ppr" type="number" min="1000"><span class="err"></span></label><label class="f" id="pc">Danh mục<select id="pca"><option value="">Chọn danh mục</option>${CATS.map((c,i)=>`<option value="${i}">${c[0]}</option>`).join('')}</select><span class="err"></span></label></div>
- <label class="f">Tình trạng<select id="pk">${CONDS.map((c,i)=>`<option value="${i}">${c}</option>`).join('')}</select></label>
- <label class="f">Mô tả<textarea id="pd" rows="3" maxlength="500"></textarea></label>
- <div class="f" id="pi">Ảnh (tối đa 5)<input type="file" accept="image/*" multiple onchange="pickImgs(this)"><div class="thumbs" id="th"></div><span class="err"></span></div>
+let imageFiles=[];
+function openPost(){if(!CUR)return needLogin();pics=[];imageFiles=[];
+ openDlg(`${dh("Đăng tin bán")}<div class="db"><div class="mut">Hôm nay bạn đã đăng ${todayCount()}/5 tin. Tin cần kiểm duyệt viên duyệt trước khi hiển thị.</div>
+ <label class="f" id="pt">Tiêu đề<input id="pti" maxlength="200" placeholder="Ví dụ: Giáo trình Vật lý đại cương"><span class="err"></span></label>
+ <div class="two"><label class="f" id="pp">Giá (đ)<input id="ppr" type="number" min="1000"><span class="err"></span></label><label class="f" id="pc">Danh mục<select id="pca"><option value="">Chọn danh mục</option>${CATS.map((c,i)=>`<option value="${i}">${c[0]}</option>`).join("")}</select><span class="err"></span></label></div>
+ <label class="f">Tình trạng<select id="pk"><option value="0">Mới 99%</option><option value="1">Đã dùng, còn tốt</option><option value="2">Cũ, dùng được</option></select></label>
+ <label class="f" id="pdw">Mô tả<textarea id="pd" rows="3" maxlength="5000"></textarea><span class="err"></span></label>
+ <div class="f" id="pi">Ảnh (tối đa 5)<input type="file" accept="image/jpeg,image/png,image/webp" multiple onchange="pickImgs(this)"><div class="thumbs" id="th"></div><span class="err"></span></div>
  <button class="btn" onclick="submitPost()">Gửi duyệt</button></div>`)}
-function pickImgs(inp){const fs=[...inp.files].slice(0,5);pics=[];$('#th').innerHTML='';fs.forEach(f=>{const r=new FileReader();r.onload=()=>{pics.push(r.result);$('#th').insertAdjacentHTML('beforeend',`<img src="${r.result}" alt="">`)};r.readAsDataURL(f)})}
-function submitPost(){const bad=(id,m)=>{const f=$('#'+id);f.classList.add('bad');f.querySelector('.err').textContent=m;return 1};
- ['pt','pp','pc','pi'].forEach(i=>{$('#'+i).classList.remove('bad');$('#'+i).querySelector('.err').textContent=''});
- const t=$('#pti').value.trim(),p=+$('#ppr').value,c=$('#pca').value;let e=0;
- if(t.length<5)e+=bad('pt','Tiêu đề cần ít nhất 5 ký tự.');
- if(!Number.isInteger(p)||p<1000)e+=bad('pp','Giá phải là số nguyên từ 1.000đ trở lên.');
- if(c==='')e+=bad('pc','Hãy chọn danh mục.');
- if(!pics.length)e+=bad('pi','Cần ít nhất 1 ảnh.');
- if(e)return;
- if(todayCount()>=DAILY){$('#dlg').close();return toast(`Bạn đã đạt giới hạn ${DAILY} tin mỗi ngày (lỗi 429). Hãy quay lại vào ngày mai.`)}
- L.push({id:L.length+1,t,p,c:+c,k:+$('#pk').value,s:me(),a:0,n:pics.length,im:pics.slice(),st:'pending',e:CATS[+c][1],ds:$('#pd').value.trim()||'Không có mô tả.'});
- notify(me(),`Tin "${t}" đã được gửi, đang chờ kiểm duyệt`,'mine','📝');
- $('#dlg').close();toast('Đã gửi tin. Tin sẽ hiển thị sau khi kiểm duyệt viên duyệt.');go('mine')}
+function pickImgs(input){
+ imageFiles=[...input.files].slice(0,5);
+ pics=[];
+ $("#th").innerHTML="";
+ imageFiles.forEach(file=>{
+  const reader=new FileReader();
+  reader.onload=()=>{$("#th").insertAdjacentHTML("beforeend",`<img src="${reader.result}" alt="">`)};
+  reader.readAsDataURL(file);
+ });
+}
+async function submitPost(){
+ const bad=(id,message)=>{const field=$("#"+id);field.classList.add("bad");field.querySelector(".err").textContent=message;return 1};
+ ["pt","pp","pc","pi","pdw"].forEach(id=>{$("#"+id).classList.remove("bad");$("#"+id).querySelector(".err").textContent=""});
+ const title=$("#pti").value.trim(),price=+$("#ppr").value,categoryIndex=+$("#pca").value,description=$("#pd").value.trim();
+ let errors=0;
+ if(title.length<5)errors+=bad("pt","Tiêu đề cần ít nhất 5 ký tự.");
+ if(!Number.isInteger(price)||price<1000)errors+=bad("pp","Giá phải là số nguyên từ 1.000đ trở lên.");
+ if($("#pca").value===""||!CAT_IDS[categoryIndex])errors+=bad("pc","Hãy chọn danh mục.");
+ if(description.length<10)errors+=bad("pdw","Mô tả cần ít nhất 10 ký tự.");
+ if(imageFiles.length<1)errors+=bad("pi","Cần ít nhất 1 ảnh.");
+ if(errors)return;
+
+ try{
+  const created=await api("/listings",{method:"POST",body:JSON.stringify({
+   title,description,price,condition:["like_new","good","fair"][+$("#pk").value],category_id:CAT_IDS[categoryIndex]
+  })});
+  const form=new FormData();
+  imageFiles.forEach(file=>form.append("files",file));
+  await api(`/listings/${created.id}/images`,{method:"POST",body:form});
+  await loadFromApi();
+  $("#dlg").close();
+  toast("Đã gửi tin. Tin sẽ hiển thị sau khi kiểm duyệt viên duyệt.");
+  go("mine");
+ }catch(error){
+  toast(error.message||"Không thể đăng tin. Kiểm tra dữ liệu và ảnh.");
+ }
+}
 function side(){const u=CUR?U[me()]:{n:'Khách',h:'Chưa đăng nhập'},ini=u.n[0];$('#pn').textContent=u.n;$('#ph').textContent=u.h;
  ['pav','cav'].forEach(i=>$('#'+i).textContent=CUR?ini:'?');
  $('#cmpt').textContent=CUR?`${u.n} ơi, bạn cần bán gì hôm nay?`:'Đăng nhập để bắt đầu bán hàng';
