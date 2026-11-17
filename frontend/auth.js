@@ -1,125 +1,160 @@
-/* Xác thực: ưu tiên backend FastAPI (localhost:8001), dự phòng bằng localStorage (tài khoản demo). */
-const UKEY='cdcsv_users',SKEY='cdcsv_session',AKEY='cdcsv_admin';
-const GOOGLE_CLIENT_ID=''; // Dán Client ID lấy từ Google Cloud Console vào đây để dùng đăng nhập Google thật
-const ADMIN={email:'admin@demo.vn',pw:'admin123'};
-// Docker/Nginx cùng origin: /api/v1 được proxy tới FastAPI trong mạng Compose.
-const AUTH_API="/api/v1";
-const AUTH_TOKEN_KEY="cdcsv_token";
-const AUTH_BUSER_KEY="cdcsv_buser";
+/* Xác thực tập trung qua FastAPI. Không xác thực giả bằng localStorage. */
+const UKEY = "cdcsv_users";
+const SKEY = "cdcsv_session";
+const AKEY = "cdcsv_admin";
+const GOOGLE_CLIENT_ID = "";
+const AUTH_API_ORIGIN = location.port === "5500"
+  ? `${location.protocol}//${location.hostname}:8001`
+  : "";
+const AUTH_API = AUTH_API_ORIGIN + "/api/v1";
+const AUTH_TOKEN_KEY = "cdcsv_token";
+const AUTH_BUSER_KEY = "cdcsv_buser";
 
-async function sha(p){
-  try{const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode('cdcsv:'+p));return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('')}
-  catch(e){let h=5381;for(const c of 'cdcsv:'+p)h=(h*33^c.charCodeAt(0))>>>0;return 'x'+h}
+function getUsers() {
+  try { return JSON.parse(localStorage.getItem(UKEY) || "[]"); }
+  catch { return []; }
 }
-function getUsers(){try{return JSON.parse(localStorage.getItem(UKEY)||'[]')}catch(e){return[]}}
-function putUsers(a){localStorage.setItem(UKEY,JSON.stringify(a))}
-async function seedUsers(){
-  if(getUsers().length)return;
-  const h=await sha('123456');
-  putUsers([['u1','Nguyễn Văn An','an@demo.vn','SV0001'],['u2','Minh Anh','minhanh@demo.vn','SV0002'],['u3','Hoàng Long','long@demo.vn','SV0003'],['u4','Thu Hà','ha@demo.vn','SV0004']]
-    .map(([id,name,email,mssv])=>({id,name,email,mssv,phone:'0900000000',pw:h})));
+function putUsers(users) {
+  localStorage.setItem(UKEY, JSON.stringify(users));
 }
-
-function session(){
-  try{
-    const b=localStorage.getItem(AUTH_BUSER_KEY);
-    if(b&&localStorage.getItem(AUTH_TOKEN_KEY))return JSON.parse(b);
-    const id=localStorage.getItem(SKEY);
-    return id?getUsers().find(u=>u.id===id)||null:null
-  }catch(e){return null}
-}
-function logout(){
-  [SKEY,AUTH_TOKEN_KEY,AUTH_BUSER_KEY,AKEY].forEach(k=>localStorage.removeItem(k))
-}
-function authBearerHeader(){const t=localStorage.getItem(AUTH_TOKEN_KEY);return t?{Authorization:'Bearer '+t}:{}}
-
-async function register(v){
-  await seedUsers();
-  const e={},name=(v.name||'').trim(),email=(v.email||'').trim().toLowerCase(),mssv=(v.mssv||'').trim(),phone=(v.phone||'').replace(/\s/g,'');
-  if(name.length<2)e.name='Nhập họ và tên (ít nhất 2 ký tự).';
-  if(!/^[A-Za-z0-9]{6,12}$/.test(mssv))e.mssv='MSSV gồm 6–12 chữ hoặc số.';
-  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))e.email='Email không hợp lệ.';
-  else if(getUsers().some(u=>u.email===email))e.email='Email này đã được đăng ký.';
-  if(!/^(0|\+84)\d{9}$/.test(phone))e.phone='Số điện thoại không hợp lệ (ví dụ 0912345678).';
-  if(!v.pw||v.pw.length<8||!/[A-Za-z]/.test(v.pw)||!/\d/.test(v.pw))e.pw='Mật khẩu ít nhất 8 ký tự, gồm cả chữ và số.';
-  if(v.pw2!==v.pw)e.pw2='Mật khẩu nhập lại không khớp.';
-  if(!v.agree)e.agree='Bạn cần đồng ý với điều khoản.';
-  if(Object.keys(e).length)return{ok:false,errors:e};
-  const u={id:'u'+Date.now().toString(36),name,email,mssv,phone,pw:await sha(v.pw)};
-  putUsers([...getUsers(),u]);localStorage.setItem(SKEY,u.id);return{ok:true}
-}
-
-/* Đăng nhập tài khoản demo lưu trong trình duyệt (dự phòng) */
-async function authLoginLocal(email,pw){
-  await seedUsers();
-  const u=getUsers().find(x=>x.email===email.toLowerCase());
-  if(!u||!u.pw||u.pw!==await sha(pw))return{ok:false,field:'pw',msg:'Email hoặc mật khẩu không đúng.'};
-  localStorage.removeItem(AUTH_TOKEN_KEY);localStorage.removeItem(AUTH_BUSER_KEY);
-  localStorage.setItem(SKEY,u.id);return{ok:true,role:'student'}
-}
-
-async function authFetchMe(tk){
-  for(const p of ['/users/me','/auth/me']){
-    try{
-      const r=await fetch(AUTH_API+p,{headers:{Authorization:'Bearer '+tk}});
-      if(r.ok)return await r.json()
-    }catch(e){}
+function session() {
+  try {
+    const user = localStorage.getItem(AUTH_BUSER_KEY);
+    const token = localStorage.getItem(AUTH_TOKEN_KEY);
+    return user && token ? JSON.parse(user) : null;
+  } catch {
+    return null;
   }
-  return null
+}
+function logout() {
+  [SKEY, AUTH_TOKEN_KEY, AUTH_BUSER_KEY, AKEY].forEach(key => localStorage.removeItem(key));
+}
+function authBearerHeader() {
+  const token = localStorage.getItem(AUTH_TOKEN_KEY);
+  return token ? { Authorization: "Bearer " + token } : {};
 }
 
-/* Đăng nhập backend: gửi form lên POST /auth/login */
-async function login(email,pw){
-  if(!email)return{ok:false,field:'email',msg:'Nhập email.'};
-  if(!pw)return{ok:false,field:'pw',msg:'Nhập mật khẩu.'};
-  email=email.trim().toLowerCase();
-  let res;
-  try{
-    res=await fetch(AUTH_API+'/auth/login',{
-      method:'POST',
-      headers:{'Content-Type':'application/x-www-form-urlencoded'},
-      body:new URLSearchParams({username:email,password:pw})
+function apiErrorMessage(data, fallback) {
+  return data?.error?.message || data?.detail || fallback;
+}
+
+async function register(values) {
+  const errors = {};
+  const name = (values.name || "").trim();
+  const email = (values.email || "").trim().toLowerCase();
+  const studentId = (values.mssv || "").trim();
+  const phone = (values.phone || "").replace(/\\s/g, "");
+
+  if (name.length < 2) errors.name = "Nhập họ và tên (ít nhất 2 ký tự).";
+  if (!/^[A-Za-z0-9]{6,12}$/.test(studentId)) errors.mssv = "MSSV gồm 6–12 chữ hoặc số.";
+  if (!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)) errors.email = "Email không hợp lệ.";
+  if (phone && !/^(0|\\+84)\\d{9}$/.test(phone)) errors.phone = "Số điện thoại không hợp lệ.";
+  if (!values.pw || values.pw.length < 8 || !/[A-Za-z]/.test(values.pw) || !/\\d/.test(values.pw)) {
+    errors.pw = "Mật khẩu ít nhất 8 ký tự, gồm cả chữ và số.";
+  }
+  if (values.pw2 !== values.pw) errors.pw2 = "Mật khẩu nhập lại không khớp.";
+  if (!values.agree) errors.agree = "Bạn cần đồng ý với điều khoản.";
+  if (Object.keys(errors).length) return { ok: false, errors };
+
+  let response;
+  try {
+    response = await fetch(AUTH_API + "/auth/register", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email,
+        password: values.pw,
+        full_name: name,
+        student_id: studentId
+      })
     });
-  }catch(e){
-    console.error('Không kết nối được Backend:',e);
-    return{ok:false,field:'pw',msg:'Không kết nối được máy chủ. Vui lòng thử lại.'};
+  } catch {
+    return { ok: false, errors: { email: "Không kết nối được Backend. Kiểm tra API tại cổng 8001." } };
   }
-  const data=await res.json().catch(()=>({}));
-  if(!res.ok){
-    const msg=data?.error?.message||data?.detail||'Email hoặc mật khẩu không đúng.';
-    console.warn('Backend trả về',res.status,data);
-    return{ok:false,field:'pw',msg};
+
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const message = apiErrorMessage(data, "Không thể tạo tài khoản.");
+    return { ok: false, errors: { email: message } };
   }
-  const access_token=data.access_token;
-  const me=data.user;
-  if(!access_token||!me){
-    console.error('Phản hồi login thiếu access_token hoặc user:',data);
-    return{ok:false,field:'pw',msg:'Phản hồi đăng nhập từ máy chủ không hợp lệ.'};
+
+  // API đăng ký không tự cấp token: đăng nhập ngay bằng tài khoản vừa tạo.
+  const loginResult = await login(email, values.pw);
+  if (!loginResult.ok) {
+    return { ok: false, errors: { pw: "Tạo tài khoản thành công nhưng đăng nhập tự động thất bại. Hãy đăng nhập lại." } };
   }
-  const role=String(me.role||'student').toLowerCase();
-  const u={
-    id:me.id,
-    name:me.full_name||email.split('@')[0],
-    email:me.email||email,
-    mssv:me.student_id||'',
-    phone:'',
-    role,
-    backend:true
-  };
-  localStorage.removeItem(SKEY);
-  localStorage.setItem(AUTH_TOKEN_KEY,access_token);
-  localStorage.setItem(AUTH_BUSER_KEY,JSON.stringify(u));
-  if(role==='admin'||role==='moderator')localStorage.setItem(AKEY,'1');
-  else localStorage.removeItem(AKEY);
-  return{ok:true,role};
+  return { ok: true, role: loginResult.role };
 }
 
-async function loginGoogle(p){
-  await seedUsers();
-  const email=(p.email||'').toLowerCase();let u=getUsers().find(x=>x.email===email);
-  if(!u){u={id:'g'+Date.now().toString(36),name:p.name||email.split('@')[0],email,mssv:'',phone:'',pw:'',google:true};putUsers([...getUsers(),u])}
-  localStorage.setItem(SKEY,u.id);return{ok:true}
+async function authFetchMe(token) {
+  try {
+    const response = await fetch(AUTH_API + "/users/me", {
+      headers: { Authorization: "Bearer " + token }
+    });
+    return response.ok ? await response.json() : null;
+  } catch {
+    return null;
+  }
 }
-function decodeJwt(t){const b=t.split('.')[1].replace(/-/g,'+').replace(/_/g,'/');return JSON.parse(decodeURIComponent(escape(atob(b))))}
-function adminLogin(e,p){if(e.toLowerCase()===ADMIN.email&&p===ADMIN.pw){localStorage.setItem(AKEY,'1');return true}return false}
-function adminLogout(){localStorage.removeItem(AKEY)}
+
+async function login(email, password) {
+  if (!email) return { ok: false, field: "email", msg: "Nhập email." };
+  if (!password) return { ok: false, field: "pw", msg: "Nhập mật khẩu." };
+
+  email = email.trim().toLowerCase();
+  let response;
+  try {
+    response = await fetch(AUTH_API + "/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ username: email, password })
+    });
+  } catch (error) {
+    console.error("Không kết nối được Backend:", error);
+    return { ok: false, field: "pw", msg: "Không kết nối được máy chủ. Kiểm tra Backend và thử lại." };
+  }
+
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    console.warn("Backend trả về", response.status, data);
+    return { ok: false, field: "pw", msg: apiErrorMessage(data, "Email hoặc mật khẩu không đúng.") };
+  }
+
+  if (!data.access_token || !data.user) {
+    console.error("Phản hồi login thiếu access_token hoặc user:", data);
+    return { ok: false, field: "pw", msg: "Phản hồi đăng nhập từ máy chủ không hợp lệ." };
+  }
+
+  const user = data.user;
+  const role = String(user.role || "student").toLowerCase();
+  const browserUser = {
+    id: user.id,
+    name: user.full_name || email.split("@")[0],
+    email: user.email || email,
+    mssv: user.student_id || "",
+    phone: "",
+    role,
+    backend: true
+  };
+
+  localStorage.removeItem(SKEY);
+  localStorage.setItem(AUTH_TOKEN_KEY, data.access_token);
+  localStorage.setItem(AUTH_BUSER_KEY, JSON.stringify(browserUser));
+  if (role === "admin" || role === "moderator") localStorage.setItem(AKEY, "1");
+  else localStorage.removeItem(AKEY);
+  return { ok: true, role };
+}
+
+/* Tắt các luồng đăng nhập giả; Google OAuth cần được xác minh ở Backend trước khi bật. */
+async function authLoginLocal() {
+  return { ok: false, msg: "Đăng nhập tài khoản demo trên trình duyệt đã bị tắt. Hãy dùng tài khoản Backend." };
+}
+async function loginGoogle() {
+  return { ok: false, msg: "Đăng nhập Google chưa được cấu hình xác thực phía Backend." };
+}
+function decodeJwt(token) {
+  const part = token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
+  return JSON.parse(decodeURIComponent(escape(atob(part))));
+}
+function adminLogin() { return false; }
+function adminLogout() { localStorage.removeItem(AKEY); }
