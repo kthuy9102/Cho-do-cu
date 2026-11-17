@@ -42,7 +42,16 @@ function renderRes(){const box=$('#res');
 function pg(i){S.page=i;renderRes();window.scrollTo({top:$('#res').offsetTop-80})}
 function setSort(v){S.sort=v;S.page=1;$('#fs').value=v;renderRes()}
 function search(){S.q=$('#q').value.trim();S.cat=+$('#fc').value;S.min=$('#fmin').value;S.max=$('#fmax').value;S.sort=$('#fs').value;S.page=1;if(S.view!=='home')go('home');else{renderRes();side()}}
-function fav(id,e){e.stopPropagation();if(!CUR)return needLogin();S.fav.has(id)?S.fav.delete(id):S.fav.add(id);renderRes();side()}
+async function fav(id,e){
+ e.stopPropagation();
+ if(!CUR)return needLogin();
+ const wasSaved=S.fav.has(id);
+ try{
+  await api(`/listings/${id}/favorite`,{method:wasSaved?'DELETE':'PUT'});
+  if(wasSaved)S.fav.delete(id);else S.fav.add(id);
+  renderRes();side();
+ }catch(error){toast(error.message||'Không thể cập nhật danh sách yêu thích.')}
+}
 
 function row(l,right,sub){return `<div class="ls"><div class="gr" onclick="openDetail(${l.id})">${''}<b>${esc(l.t)}</b><span class="mut">${vnd(l.p)} · ${esc(U[l.s].n)} · ${ago(l.a)}${sub||''}</span></div>${right}</div>`.replace('<div class="gr"',`<div class="gr"`)}
 const stB=l=>({pending:'<span class="badge w">Chờ duyệt</span>',approved:'<span class="badge">Đang bán</span>',sold:'<span class="badge">Đã bán</span>',hidden:'<span class="badge x">Bị ẩn</span>'}[l.st]);
@@ -241,7 +250,12 @@ function refresh(keep){save();const v=S.view;$('#cmp').style.display=$('#sc').st
 $('#chips').innerHTML=TAGS.map(t=>`<button class="chip" onclick="tag('${t[1]}')">#${t[0]}</button>`).join('');
 $('#fc').innerHTML='<option value="-1">Tất cả danh mục</option>'+CATS.map((c,i)=>`<option value="${i}">${c[0]}</option>`).join('');
 addEventListener('hashchange',route);
-loadFromApi().then(route).catch(e=>{console.error(e);toast('Không kết nối được máy chủ');route()});
+loadFromApi().then(route).catch(error=>{
+ console.error('Không tải được dữ liệu Backend:',error);
+ L=[];O=[];R=[];RP=[];ORD=[];NOTI=[];CATS.length=0;S.fav=new Set();
+ route();
+ toast('Không tải được dữ liệu từ Backend. Kiểm tra API và kết nối CSDL.');
+});
 
 // ===== MENU NGƯỜI DÙNG (góc phải) =====
 function ico(n){return {
