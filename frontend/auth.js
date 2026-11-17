@@ -1,6 +1,6 @@
 /* =========================
    XÁC THỰC TÀI KHOẢN
-   Backend FastAPI + localStorage dự phòng
+   Backend FastAPI (không dùng xác thực local)
    Đăng nhập lưu bằng sessionStorage => mỗi tab giữ tài khoản riêng
 ========================= */
 
@@ -66,14 +66,7 @@ async function seedUsers() {
 function session() {
     try {
         const b = sessionStorage.getItem(AUTH_BUSER_KEY);
-
-        if (b && sessionStorage.getItem(AUTH_TOKEN_KEY)) {
-            return JSON.parse(b);
-        }
-
-        const id = sessionStorage.getItem(SKEY);
-
-        return id ? getUsers().find(u => u.id === id) || null : null;
+        return b && sessionStorage.getItem(AUTH_TOKEN_KEY) ? JSON.parse(b) : null;
     } catch (e) {
         return null;
     }
@@ -94,20 +87,8 @@ function authBearerHeader() {
 
 
 /* Đăng nhập local dự phòng */
-async function authLoginLocal(email, pw) {
-    await seedUsers();
-
-    const u = getUsers().find(x => x.email === email.toLowerCase());
-
-    if (!u || !u.pw || u.pw !== await sha(pw)) {
-        return { ok: false, field: 'pw', msg: 'Email hoặc mật khẩu không đúng.' };
-    }
-
-    sessionStorage.removeItem(AUTH_TOKEN_KEY);
-    sessionStorage.removeItem(AUTH_BUSER_KEY);
-    sessionStorage.setItem(SKEY, u.id);
-
-    return { ok: true, role: 'student' };
+async function authLoginLocal() {
+    return { ok: false, msg: 'Đăng nhập local đã bị tắt. Vui lòng sử dụng tài khoản trên máy chủ.' };
 }
 
 
@@ -124,13 +105,11 @@ function decodeJwt(t) {
 
 /* Lấy thông tin người dùng từ backend */
 async function authFetchMe(tk) {
-    for (const p of ['/users/me', '/auth/me']) {
-        try {
-            const r = await fetch(AUTH_API_BASE + p, { headers: { Authorization: 'Bearer ' + tk } });
-            if (r.ok) return await r.json();
-        } catch (e) {}
-    }
-    return null;
+    const r = await fetch(AUTH_API_BASE + '/users/me', {
+        headers: { Authorization: 'Bearer ' + tk }
+    });
+    if (!r.ok) throw new Error('Không lấy được hồ sơ tài khoản (HTTP ' + r.status + ').');
+    return r.json();
 }
 
 
@@ -151,7 +130,7 @@ async function login(email, pw) {
         });
     } catch (e) {
         console.warn('Không kết nối được backend:', e);
-        return authLoginLocal(email, pw);
+        return { ok: false, field: 'pw', msg: 'Không kết nối được máy chủ. Không thể đăng nhập khi Backend ngoại tuyến.' };
     }
 
     if (!res.ok) {
@@ -177,7 +156,7 @@ async function login(email, pw) {
         sessionStorage.setItem(AUTH_TOKEN_KEY, access_token);
         sessionStorage.removeItem(SKEY);
 
-        const me = await authFetchMe(access_token) || {};
+        const me = await authFetchMe(access_token);
         const claims = decodeJwt(access_token);
 
         const role = String(
@@ -268,33 +247,13 @@ async function register(v) {
 
 
 /* Đăng nhập Google */
-async function loginGoogle(p) {
-    await seedUsers();
-
-    const email = (p.email || '').toLowerCase();
-    let u = getUsers().find(x => x.email === email);
-
-    if (!u) {
-        u = {
-            id: 'g' + Date.now().toString(36),
-            name: p.name || email.split('@')[0],
-            email, mssv: '', phone: '', pw: '', google: true
-        };
-        putUsers([...getUsers(), u]);
-    }
-
-    sessionStorage.setItem(SKEY, u.id);
-
-    return { ok: true };
+async function loginGoogle() {
+    return { ok: false, msg: 'Đăng nhập Google chưa được cấu hình trên Backend.' };
 }
 
 
 /* Đăng nhập quản trị local dự phòng */
-function adminLogin(e, p) {
-    if (e.trim().toLowerCase() === ADMIN.email && p === ADMIN.pw) {
-        sessionStorage.setItem(AKEY, '1');
-        return true;
-    }
+function adminLogin() {
     return false;
 }
 
