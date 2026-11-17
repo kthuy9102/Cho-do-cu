@@ -1,5 +1,6 @@
 const CUR=session();
 const me=()=>CUR?CUR.id:null;
+if(CUR)U[CUR.id]={n:CUR.name,h:'@'+String(CUR.email||'').split('@')[0]};
 getUsers().forEach(u=>U[u.id]={n:u.name,h:'@'+u.email.split('@')[0]});
 const S={view:'home',q:'',cat:-1,min:'',max:'',sort:'all',page:1,fav:new Set(),g:0,ot:'buy',og:'all'};
 const FK='cdcsv_fav_'+(me()||'guest');
