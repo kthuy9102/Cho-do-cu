@@ -8,7 +8,7 @@ function save(){if(!saveData())toast('Bộ nhớ trình duyệt đầy, dữ li�
 function needLogin(){openDlg(`${dh('Cần đăng nhập')}<div class="db"><p style="margin:0">Hãy đăng nhập hoặc tạo tài khoản để tiếp tục.</p><div class="row"><a class="btn" style="flex:1;text-align:center" href="login.html#login">Đăng nhập</a><a class="btn o" style="flex:1;text-align:center" href="login.html#register">Đăng ký</a></div></div>`)}
 addEventListener('storage',e=>{if(e.key===KEY){const had=new Set(NOTI.map(x=>x.id));loadData();const fresh=NOTI.filter(x=>CUR&&x.to===me()&&!had.has(x.id));refresh();if(fresh.length)toast('🔔 '+fresh[fresh.length-1].t)}});
 const TAGS=[['Laptop','laptop'],['Sách','sach'],['Điện Thoại','dien thoai'],['Áo Khoác','ao khoac'],['Bàn Ghế','ban']];
-const DAILY=3;
+const DAILY=5;
 
 function toast(m){const t=$('#toast');t.textContent=m;t.style.display='block';clearTimeout(toast.h);toast.h=setTimeout(()=>t.style.display='none',3200)}
 function rep(u){const r=R.filter(x=>x.to===u);return r.length?{avg:(r.reduce((a,b)=>a+b.star,0)/r.length).toFixed(1),n:r.length}:null}
@@ -59,7 +59,7 @@ function mineHtml(){
  const a=L.filter(l=>l.s===me()),b=O.filter(o=>o.f===me());
  return `<div class="card"><div class="hh">Tin của tôi (${a.length}) · hôm nay ${todayCount()}/${DAILY}</div>${a.length?a.map(l=>{const n=O.filter(o=>o.l===l.id&&o.st==='pending').length;return row(l,`<div class="acts">${stB(l)}${n?`<span class="badge w">${n} đề nghị mới</span>`:''}</div>`)}).join(''):'<div class="empty">Bạn chưa đăng tin nào.</div>'}</div>
  <div class="card"><div class="hh">Đề nghị trả giá của tôi (${b.length})</div>${b.length?b.map(o=>{const l=L.find(x=>x.id===o.l);return row(l,`<div class="acts"><span class="badge ${o.st==='rejected'?'x':o.st==='pending'?'w':''}">${{pending:'Chờ người bán phản hồi',accepted:'Đã được chấp nhận',rejected:'Bị từ chối'}[o.st]}</span><b>${vnd(o.p)}</b></div>`)}).join(''):'<div class="empty">Bạn chưa gửi đề nghị trả giá nào.</div>'}</div>
- <div class="card pad" style="display:flex;justify-content:space-between;align-items:center;gap:12px"><span>Đơn bạn đã mua và đã bán nằm ở mục <b>Đơn hàng</b>.</span><button class="btn sm" onclick="openOrders('buy')">Xem đơn hàng</button></div>`;
+`;
 }
 function todayCount(){return L.filter(l=>l.s===me()&&l.a===0).length}
 function openDlg(h){const d=$('#dlg');d.innerHTML=h;if(!d.open)d.showModal()}
@@ -327,7 +327,7 @@ function side(){const u=CUR?U[me()]:{n:'Khách',h:'Chưa đăng nhập'},ini=u.n
  $('#who').innerHTML=CUR?bellHtml()+userMenu(u,ini):`<a class="btn o sm" href="login.html#login">Đăng nhập</a><a class="btn sm" href="login.html#register">Đăng ký</a>`;
  $('#onl').innerHTML=CUR?`<div class="av on">${esc(ini)}</div>${esc(u.n)}`:'<span class="mut">Đăng nhập để hiện ở đây</span>';
  const N=[['home','🏪','Mua sắm'],['home','📦','Tìm sản phẩm','find'],['saved','♡','Đã lưu']];
- if(CUR){N.push(['mine','👤','Tin của tôi']);const c=ordBadge();N.push(['orders','🧾','Đơn hàng'+(c?` <span class="nbd">${c}</span>`:'')])}
+ if(CUR)N.push(['mine','👤','Tin của tôi']);
  $('#nv').innerHTML=N.map(n=>`<button class="${n[3]?'':S.view===n[0]?'on':''}" onclick="${n[3]?`go('home');$('#q').focus()`:`go('${n[0]}')`}"><span class="ic">${n[1]}</span>${n[2]}</button>`).join('');
  const vis=L.filter(l=>l.st==='approved'||l.st==='sold');
  $('#cats').innerHTML=CATS.map((c,i)=>`<button class="cat ${S.cat===i?'on':''}" onclick="pickCat(${i})"><span>${c[1]}</span><span>${c[0]}</span><em>${vis.filter(l=>l.c===i).length}</em></button>`).join('');
@@ -361,12 +361,11 @@ function userMenu(u,ini){return `<div class="um"><button class="ump" id="umb" ar
   <button role="menuitem" onclick="umGo('profile')">${ico('user')}Thông tin tài khoản</button>
   <button role="menuitem" onclick="umGo('saved')">${ico('heart')}Tin đăng đã lưu</button>
   <button role="menuitem" onclick="umGo('mine')">${ico('box')}Quản lý bài đăng</button>
-  <button role="menuitem" onclick="umGo('orders')">${ico('receipt')}Đơn hàng</button>
   <hr><button role="menuitem" onclick="logout();location.href='login.html'">${ico('lock')}Đăng xuất</button>
  </div></div>`}
 function toggleUM(){const m=$('#umm'),open=m.hidden;m.hidden=!open;$('#umb').setAttribute('aria-expanded',open)}
 function closeUM(){const m=$('#umm');if(m){m.hidden=true;$('#umb').setAttribute('aria-expanded','false')}}
-function umGo(k){closeUM();if(k==='profile')return openProfile();if(k==='orders'){S.ot='buy';S.og='all'}go(k)}
+function umGo(k){closeUM();if(k==='profile')return openProfile();go(k)}
 document.addEventListener('click',e=>{if(!e.target.closest('.um'))closeUM()});
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeUM()});
 function openProfile(){const m=me();
