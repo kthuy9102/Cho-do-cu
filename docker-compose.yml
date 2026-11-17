@@ -9,7 +9,6 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in the root .env file}
       TZ: Asia/Ho_Chi_Minh
     ports:
-      # Dùng 5433 ở máy host để không đụng PostgreSQL đang chạy ở cổng 5432.
       - "127.0.0.1:5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
@@ -28,6 +27,12 @@ services:
       dockerfile: Dockerfile
     container_name: chodocu-api
     restart: unless-stopped
+    command:
+      - sh
+      - -c
+      - >-
+        python -m scripts.seed --create-tables &&
+        exec uvicorn app.main:app --host 0.0.0.0 --port 8000 --proxy-headers --forwarded-allow-ips='*'
     environment:
       ENVIRONMENT: development
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-chodocu}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in the root .env file}@db:5432/${POSTGRES_DB:-chodocu}
