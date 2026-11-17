@@ -76,6 +76,44 @@ Thư mục `postman/` có 2 file: `chodocu.postman_collection.json` (82 request,
 
 Chạy bằng dòng lệnh (dùng được trong CI nếu có server): `npx newman run postman/chodocu.postman_collection.json -e postman/chodocu.postman_environment.json`.
 
+
+## 2.1. Quản lý schema bằng Alembic
+
+Alembic là nguồn quản lý phiên bản cấu trúc CSDL. Không dùng `Base.metadata.create_all()` trong quy trình triển khai production.
+
+**CSDL mới / chưa có bảng:**
+
+```bash
+cd backend
+alembic upgrade head
+```
+
+**Tạo migration sau khi thay đổi ORM model:**
+
+```bash
+cd backend
+alembic revision --autogenerate -m "describe_schema_change"
+alembic upgrade head
+```
+
+Luôn mở và rà soát file migration được sinh tự động trước khi chạy; autogenerate không phát hiện đầy đủ mọi thay đổi (đặc biệt rename dữ liệu/column và một số constraint).
+
+**CSDL đã có dữ liệu từ trước:** trước khi áp dụng migration baseline, sao lưu và kiểm tra schema thực tế. Nếu schema hiện tại khớp hoàn toàn với model ở revision đầu tiên, đánh dấu baseline mà không tạo/xóa bảng:
+
+```bash
+cd backend
+alembic stamp 0001_initial_schema
+```
+
+Không chạy `alembic upgrade head` trên CSDL cũ chưa được đối chiếu. Không dùng `alembic downgrade base` trên dữ liệu production vì migration đầu tiên có thao tác xóa các bảng ứng dụng.
+
+Kiểm tra revision hiện tại:
+
+```bash
+alembic current
+alembic history
+```
+
 ## 3. Vai trò và ma trận phân quyền
 
 Vai trò: `student` (vừa mua vừa bán), `moderator`, `admin` (admin có mọi quyền của moderator). Đăng ký luôn tạo `student`.
