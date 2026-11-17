@@ -106,6 +106,10 @@ async function loadFromApi() {
 
   const rl = await api("/listings?page_size=100");
   L = rl.items.map(mapListing);
+  // Backend chưa có Orders/Notifications API: không hiển thị dữ liệu demo/local như dữ liệu thật.
+  ORD = [];
+  NOTI = [];
+  RP = [];
   rl.items.forEach(x => { if (x.seller) U[x.seller.id] = { n: x.seller.full_name, h: "" }; });
 
   if (getToken()) {
