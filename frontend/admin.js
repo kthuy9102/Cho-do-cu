@@ -66,7 +66,6 @@ async function loadModerationData() {
   const unique = new Map(items.map(item => [item.id, item]));
   L = [...unique.values()].map(mapListing);
 
-  U = U || {};
   L.forEach(item => {
     const source = items.find(row => row.id === item.id);
     U[item.s] = { n: source.seller.full_name, h: "" };
