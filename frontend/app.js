@@ -368,22 +368,33 @@ function closeUM(){const m=$('#umm');if(m){m.hidden=true;$('#umb').setAttribute(
 function umGo(k){closeUM();if(k==='profile')return openProfile();go(k)}
 document.addEventListener('click',e=>{if(!e.target.closest('.um'))closeUM()});
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeUM()});
-function openProfile(){const m=me();
- openDlg(`${dh('Thông tin tài khoản')}<div class="db"><div class="sel"><div class="av lg" style="text-transform:uppercase">${esc(CUR.name[0])}</div><div><b>${esc(CUR.name)}</b><div class="mut">${repTxt(m)}</div></div></div>
- <div class="two"><label class="f" id="pf_name">Họ và tên<input id="pfn" maxlength="60" value="${esc(CUR.name)}"><span class="err"></span></label><label class="f" id="pf_phone">Số điện thoại<input id="pfp" type="tel" maxlength="15" value="${esc(CUR.phone||'')}"><span class="err"></span></label></div>
- <div class="two"><label class="f">Email<input value="${esc(CUR.email)}" disabled></label><label class="f">Mã sinh viên<input value="${esc(CUR.mssv||'Chưa cập nhật')}" disabled></label></div>
- <div class="mut">Tin đã đăng: <b>${L.filter(l=>l.s===m).length}</b> · Đơn mua: <b>${ORD.filter(o=>o.b===m).length}</b> · Đơn bán: <b>${ORD.filter(o=>o.s===m).length}</b></div>
- <button class="btn" onclick="saveProfile()">Lưu thay đổi</button></div>`)}
-function saveProfile(){
- const bad=(id,msg)=>{const f=$('#'+id);f.classList.add('bad');f.querySelector('.err').textContent=msg;return 1};
- ['pf_name','pf_phone'].forEach(i=>{$('#'+i).classList.remove('bad');$('#'+i).querySelector('.err').textContent=''});
- const name=$('#pfn').value.trim(),phone=$('#pfp').value.replace(/\s+/g,'');let e=0;
- if(name.length<2)e+=bad('pf_name','Nhập họ và tên (ít nhất 2 ký tự).');
- if(phone&&!/^(0|\+84)\d{9}$/.test(phone))e+=bad('pf_phone','Số điện thoại không hợp lệ (ví dụ 0912345678).');
- if(e)return;
- const us=getUsers(),u=us.find(x=>x.id===CUR.id);if(u){u.name=name;u.phone=phone;putUsers(us)}
- CUR.name=name;CUR.phone=phone;if(U[CUR.id])U[CUR.id].n=name;
- $('#dlg').close();toast('Đã cập nhật thông tin tài khoản.');refresh(true)}
+function openProfile(){
+ const userId=me();
+ openDlg(`${dh("Thông tin tài khoản")}<div class="db">
+  <div class="sel"><div class="av lg" style="text-transform:uppercase">${esc(CUR.name[0])}</div><div><b>${esc(CUR.name)}</b><div class="mut">${repTxt(userId)}</div></div></div>
+  <label class="f" id="pf_name">Họ và tên<input id="pfn" maxlength="100" value="${esc(CUR.name)}"><span class="err"></span></label>
+  <div class="two"><label class="f">Email<input value="${esc(CUR.email)}" disabled></label><label class="f">Mã sinh viên<input value="${esc(CUR.mssv||"Chưa cập nhật")}" disabled></label></div>
+  <div class="mut">Tin đã đăng: <b>${L.filter(item=>item.s===userId).length}</b> · Đề nghị đã gửi: <b>${O.filter(item=>item.f===userId).length}</b></div>
+  <button class="btn" onclick="saveProfile()">Lưu thay đổi</button>
+ </div>`);
+}
+async function saveProfile(){
+ const field=$("#pf_name");
+ field.classList.remove("bad");
+ field.querySelector(".err").textContent="";
+ const name=$("#pfn").value.trim();
+ if(name.length<2){field.classList.add("bad");field.querySelector(".err").textContent="Nhập họ và tên (ít nhất 2 ký tự).";return}
+ try{
+  await api("/users/me",{method:"PATCH",body:JSON.stringify({full_name:name})});
+  CUR.name=name;
+  if(U[CUR.id])U[CUR.id].n=name;
+  await loadFromApi();
+  $("#dlg").close();
+  toast("Đã cập nhật hồ sơ tài khoản.");
+  refresh(true);
+ }catch(error){toast(error.message||"Không thể cập nhật hồ sơ.")}
+}
+
 
 // ===== THÔNG BÁO (chuông) =====
 function nm(id){return U[id]?U[id].n:'Người dùng'}
