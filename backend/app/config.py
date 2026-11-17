@@ -22,9 +22,15 @@ class Settings(BaseSettings):
     upload_dir: str = "uploads"
     max_upload_size_mb: int = 5
     max_images_per_listing: int = 5
-    max_listings_per_day: int = 5  # chống spam tin đăng
+    max_listings_per_day: int = 5
 
-    cors_origins: list[str] = ["http://localhost:3000", "http://localhost:5173"]
+    cors_origins: list[str] = [
+        "http://localhost:3000",
+        "http://localhost:5173",
+        "http://localhost:5500",
+        "http://127.0.0.1:5500",
+        "http://localhost:8080",
+    ]
 
     log_level: str = "INFO"
     log_json: bool = True
