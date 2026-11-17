@@ -11,10 +11,10 @@ test("all local HTML script and stylesheet references exist", () => {
 
   for (const htmlFile of htmlFiles) {
     const html = fs.readFileSync(path.join(frontendDir, htmlFile), "utf8");
-    const references = [...html.matchAll(/(?:src|href)\\s*=\\s*["']([^"']+)["']/gi)];
+    const references = [...html.matchAll(/(?:src|href)\s*=\s*["']([^"']+)["']/gi)];
 
     for (const [, reference] of references) {
-      if (/^(?:[a-z]+:|\\/\\/|#)/i.test(reference)) continue;
+      if (/^(?:[a-z]+:|\/\/|#)/i.test(reference)) continue;
       const localPath = reference.split(/[?#]/, 1)[0];
       if (!localPath) continue;
       const target = path.resolve(frontendDir, path.dirname(htmlFile), localPath);
@@ -27,9 +27,9 @@ test("frontend and auth share the versioned API and JWT storage key", () => {
   const api = fs.readFileSync(path.join(frontendDir, "api.js"), "utf8");
   const auth = fs.readFileSync(path.join(frontendDir, "auth.js"), "utf8");
 
-  assert.match(api, /const API = API_ORIGIN \\+ ["']\\/api\\/v1["']/);
-  assert.match(auth, /const AUTH_API = AUTH_API_ORIGIN \\+ ["']\\/api\\/v1["']/);
-  assert.match(api, /getItem\\(["']cdcsv_token["']\\)/);
-  assert.match(auth, /AUTH_TOKEN_KEY = ["']cdcsv_token["']/);
-  assert.match(auth, /fetch\\(AUTH_API \\+ ["']\\/auth\\/register["']/);
+  assert.ok(api.includes('const API = API_ORIGIN + "/api/v1"'));
+  assert.ok(auth.includes('const AUTH_API = AUTH_API_ORIGIN + "/api/v1"'));
+  assert.ok(api.includes('localStorage.getItem("cdcsv_token")'));
+  assert.ok(auth.includes('const AUTH_TOKEN_KEY = "cdcsv_token"'));
+  assert.ok(auth.includes('fetch(AUTH_API + "/auth/register"'));
 });
