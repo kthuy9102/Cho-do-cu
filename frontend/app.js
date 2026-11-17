@@ -11,7 +11,7 @@ const TAGS=[['Laptop','laptop'],['Sách','sach'],['Điện Thoại','dien thoai'
 const DAILY=5;
 
 function toast(m){const t=$('#toast');t.textContent=m;t.style.display='block';clearTimeout(toast.h);toast.h=setTimeout(()=>t.style.display='none',3200)}
-function rep(u){const r=R.filter(x=>x.to===u);return r.length?{avg:(r.reduce((a,b)=>a+b.star,0)/r.length).toFixed(1),n:r.length}:null}
+function rep(u){const profile=U[u];if(profile&&profile.rating_avg!=null)return{avg:Number(profile.rating_avg).toFixed(1),n:profile.review_count||0};const r=R.filter(x=>x.to===u);return r.length?{avg:(r.reduce((a,b)=>a+b.star,0)/r.length).toFixed(1),n:r.length}:null}
 function repTxt(u){const r=rep(u);return r?`★ ${r.avg} (${r.n} đánh giá)`:'Chưa có đánh giá'}
 function tile(l){return `<div class="tile" style="--h:${l.id*47%360}">${l.im?`<img src="${l.im[0]}" alt="">`:`<span>${l.e}</span>`}`}
 function card(l){return `<div class="li" tabindex="0" role="button" onclick="openDetail(${l.id})" onkeydown="if(event.key==='Enter')openDetail(${l.id})">
