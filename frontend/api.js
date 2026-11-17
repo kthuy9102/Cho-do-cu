@@ -37,11 +37,29 @@ async function api(path, opt = {}) {
 }
 
 // Gọi "im lặng": lỗi không xóa token, không đá về trang đăng nhập
-async function apiQuiet(path) {
+async function apiQuiet(path, opt = {}) {
+  const h = { ...(opt.headers || {}) };
   const t = getToken();
-  const res = await fetch(API + path, { headers: t ? { Authorization: "Bearer " + t } : {} });
-  if (!res.ok) throw new Error("HTTP " + res.status);
-  return res.json();
+  if (t) h.Authorization = "Bearer " + t;
+  if (typeof opt.body === "string" && !h["Content-Type"]) h["Content-Type"] = "application/json";
+
+  let res;
+  try {
+    res = await fetch(API + path, { ...opt, headers: h });
+  } catch (e) {
+    throw new Error("Không kết nối được máy chủ.");
+  }
+
+  if (res.status === 204) return null;
+  const data = await res.json().catch(() => null);
+  if (!res.ok) {
+    const message = data?.error?.message || "Lỗi HTTP " + res.status;
+    const error = new Error(message);
+    error.status = res.status;
+    error.data = data;
+    throw error;
+  }
+  return data;
 }
 
 addEventListener("unhandledrejection", e => {
