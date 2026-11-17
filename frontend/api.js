@@ -86,33 +86,51 @@ function mapListing(x) {
   };
 }
 
+function mapOffer(x) {
+  return {
+    id: x.id,
+    l: x.listing?.id,
+    f: x.buyer?.id,
+    p: x.amount,
+    m: x.message || "",
+    st: x.status
+  };
+}
+
 async function loadFromApi() {
-  // 1. Danh mục
   const rc = await api("/categories");
   const cats = Array.isArray(rc) ? rc : rc.items;
   CAT_IDS = cats.map(c => c.id);
   CATS.length = 0;
   cats.forEach(c => CATS.push([c.name, EMO[c.slug] || "📦"]));
 
-  // 2. Tin công khai (đã duyệt)
   const rl = await api("/listings?page_size=100");
   L = rl.items.map(mapListing);
-  rl.items.forEach(x => { U[x.seller.id] = { n: x.seller.full_name, h: "" }; });
+  rl.items.forEach(x => { if (x.seller) U[x.seller.id] = { n: x.seller.full_name, h: "" }; });
 
-  // 3. Tin của chính mình, mọi trạng thái (chờ duyệt, bị ẩn...)
   if (getToken()) {
-    try {
-      const rm = await apiQuiet("/listings/mine?page_size=100");
-      rm.items.forEach(x => {
-        const i = L.findIndex(l => l.id === x.id);
-        if (i >= 0) L[i] = mapListing(x);
-        else L.push(mapListing(x));
-        U[x.seller.id] = U[x.seller.id] || { n: x.seller.full_name, h: "" };
-      });
-    } catch (e) { console.warn("Không lấy được tin của tôi:", e.message); }
+    const mine = await apiQuiet("/listings/mine?page_size=100").catch(e => {
+      console.warn("Không lấy được tin của tôi:", e.message); return { items: [] };
+    });
+    (mine.items || []).forEach(x => {
+      const i = L.findIndex(l => l.id === x.id);
+      if (i >= 0) L[i] = mapListing(x); else L.push(mapListing(x));
+      if (x.seller) U[x.seller.id] = U[x.seller.id] || { n: x.seller.full_name, h: "" };
+    });
+
+    const [sent, received, favorites] = await Promise.all([
+      apiQuiet("/offers/sent?page_size=100").catch(e => { console.warn("Offers sent:", e.message); return { items: [] }; }),
+      apiQuiet("/offers/received?page_size=100").catch(e => { console.warn("Offers received:", e.message); return { items: [] }; }),
+      apiQuiet("/favorites?page_size=100").catch(e => { console.warn("Favorites:", e.message); return { items: [] }; })
+    ]);
+    const offers = [...(sent.items || []), ...(received.items || [])];
+    O = [...new Map(offers.map(x => [x.id, x])).values()].map(mapOffer);
+    S.fav = new Set((favorites.items || []).map(x => x.id));
+  } else {
+    O = [];
+    S.fav = new Set();
   }
 
-  // 4. Ô chọn danh mục
   const fc = document.querySelector("#fc");
   if (fc) fc.innerHTML = '<option value="-1">Tất cả danh mục</option>' + CATS.map((c, i) => `<option value="${i}">${c[0]}</option>`).join("");
 }
