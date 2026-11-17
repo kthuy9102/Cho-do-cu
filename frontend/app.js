@@ -271,7 +271,10 @@ function refresh(keep){save();const v=S.view;$('#cmp').style.display=$('#sc').st
 $('#chips').innerHTML=TAGS.map(t=>`<button class="chip" onclick="tag('${t[1]}')">#${t[0]}</button>`).join('');
 $('#fc').innerHTML='<option value="-1">Tất cả danh mục</option>'+CATS.map((c,i)=>`<option value="${i}">${c[0]}</option>`).join('');
 addEventListener('hashchange',route);
-loadFromApi().then(route).catch(e=>{console.error(e);toast('Không kết nối được máy chủ');route()});
+loadFromApi().then(route).catch(e=>{
+  console.error(e);
+  $('#res').innerHTML='<div class="card empty">Không tải được dữ liệu từ máy chủ. Vui lòng kiểm tra kết nối Backend rồi tải lại trang.</div>';
+});
 
 // ===== MENU NGƯỜI DÙNG (góc phải) =====
 function ico(n){return {
@@ -426,9 +429,8 @@ const RVTXT = ['Chọn số sao', 'Tệ', 'Chưa tốt', 'Bình thường', 'T�
 function canReview(l) {
   const m = me();
   if (!CUR || !l || l.s === m) return false;
-  if (R.some(r => r.l === l.id && r.f === m)) return false;
-  return O.some(o => o.l === l.id && o.f === m && o.st === 'accepted') ||
-         ORD.some(o => o.l === l.id && o.b === m && o.st === 'done');
+  const accepted = O.find(o => o.l === l.id && o.f === m && o.st === 'accepted');
+  return !!accepted && !R.some(r => r.offer_id === accepted.id);
 }
 function repTxtL(lid) {
   const r = R.filter(x => x.l === lid);
@@ -504,7 +506,7 @@ reviewForm = function (oid) { const o = ORD.find(x => x.id === oid); if (o) open
 reviewsHtml = function (sid, lid) {
   const rs = R.filter(r => r.to === sid && (!lid || r.l === lid)).reverse().slice(0, 5);
   if (!rs.length) return '<div class="mut">Sản phẩm này chưa có đánh giá nào.</div>';
-  return rs.map(r => `<div class="rvl"><div><span class="stars">${'★'.repeat(r.star)}${'☆'.repeat(5 - r.star)}</span> <b>${esc(nm(r.f))}</b>${r.ed ? ' <span class="mut">· đã chỉnh sửa</span>' : ''}</div><div class="mut">${esc(r.x)}</div></div>`).join('');
+  return rs.map(r => `<div class="rvl"><div><span class="stars">${'★'.repeat(r.star)}${'☆'.repeat(5 - r.star)}</span> <b>${esc(nm(r.f))}</b></div><div class="mut">${esc(r.x)}</div></div>`).join('');
 };
 
 // Trang chi tiết sản phẩm: người đã đánh giá thấy nút "Sửa đánh giá"
@@ -561,7 +563,7 @@ function submitEditRv() {
 /* ===== ĐỒNG BỘ SỐ ĐẾM VÀ DANH SÁCH ĐÁNH GIÁ ===== */
 function reviewsOf(lid) {
   const l = L.find(x => x.id === lid);
-  return l ? R.filter(r => r.l === lid && r.to === l.s) : [];
+  return l ? R.filter(r => r.to === l.s) : [];
 }
 repTxtL = function (lid) {
   const r = reviewsOf(lid);
