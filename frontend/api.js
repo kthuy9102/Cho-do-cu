@@ -59,9 +59,11 @@ async function loadFromApi() {
     api("/categories"),
     api("/listings?page=1&page_size=100&sort=newest"),
     signedIn ? api("/listings/mine?page=1&page_size=100").catch(() => ({ items: [] })) : Promise.resolve({ items: [] }),
-    signedIn ? api("/favorites?page=1&page_size=100").catch(() => ({ items: [] })) : Promise.resolve({ items: [] })
+    signedIn ? api("/favorites?page=1&page_size=100").catch(() => ({ items: [] })) : Promise.resolve({ items: [] }),
+    signedIn ? api("/offers/sent?page=1&page_size=100").catch(() => ({ items: [] })) : Promise.resolve({ items: [] }),
+    signedIn ? api("/offers/received?page=1&page_size=100").catch(() => ({ items: [] })) : Promise.resolve({ items: [] })
   ];
-  const [categories, publicResult, mineResult, favoriteResult] = await Promise.all(requests);
+  const [categories, publicResult, mineResult, favoriteResult, sentResult, receivedResult] = await Promise.all(requests);
 
   if (!Array.isArray(categories)) throw new Error("API danh mục trả về dữ liệu không hợp lệ.");
   if (!publicResult || !Array.isArray(publicResult.items)) throw new Error("API tin đăng trả về dữ liệu không hợp lệ.");
@@ -70,9 +72,7 @@ async function loadFromApi() {
   CATS.length = 0;
   categories.forEach(category => CATS.push([category.name, EMO[category.slug] || "📦"]));
 
-  // Chỉ dùng dữ liệu từ API; xóa các giao dịch giả đã được lưu từ bản demo cũ.
-  O = [];
-  R = [];
+  // Không dùng dữ liệu giao dịch giả từ bản demo cũ.
   RP = [];
   ORD = [];
   NOTI = [];
@@ -99,8 +99,39 @@ async function loadFromApi() {
   }));
 
   allItems.forEach(item => {
-    U[item.seller.id] = { n: item.seller.full_name, h: "" };
+    U[item.seller.id] = { ...(U[item.seller.id] || {}), n: item.seller.full_name, h: "" };
   });
+
+  const offers = [...(sentResult.items || []), ...(receivedResult.items || [])];
+  const offerById = new Map();
+  offers.forEach(item => offerById.set(item.id, item));
+  O = [...offerById.values()].map(item => ({
+    id: item.id,
+    l: item.listing.id,
+    f: item.buyer.id,
+    p: item.amount,
+    m: item.message || "",
+    st: item.status
+  }));
+  offers.forEach(item => {
+    U[item.buyer.id] = { ...(U[item.buyer.id] || {}), n: item.buyer.full_name, h: "" };
+  });
+
+  const sellerIds = [...new Set(allItems.map(item => item.seller.id))];
+  const reviewPages = await Promise.all(sellerIds.map(id =>
+    api(`/users/${id}/reviews?page=1&page_size=100`).catch(() => ({ items: [] }))
+  ));
+  const reviews = reviewPages.flatMap(page => page.items || []);
+  R = reviews.map(review => {
+    const offer = offerById.get(review.offer_id);
+    return {
+      l: offer?.listing.id,
+      to: review.seller_id,
+      f: review.reviewer.id,
+      star: review.rating,
+      x: review.comment || ""
+    };
+  }).filter(review => review.l != null);
 
   const categoryFilter = document.querySelector("#fc");
   if (categoryFilter) {
