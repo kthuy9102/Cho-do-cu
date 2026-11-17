@@ -54,19 +54,35 @@ let CAT_IDS = [];
 const img = url => url ? (url.startsWith("http") ? url : API_ORIGIN + url) : null;
 
 async function loadFromApi() {
-  const [categories, result] = await Promise.all([
+  const signedIn = typeof session === "function" && !!session();
+  const requests = [
     api("/categories"),
-    api("/listings?page=1&page_size=100&sort=newest")
-  ]);
+    api("/listings?page=1&page_size=100&sort=newest"),
+    signedIn ? api("/listings/mine?page=1&page_size=100").catch(() => ({ items: [] })) : Promise.resolve({ items: [] }),
+    signedIn ? api("/favorites?page=1&page_size=100").catch(() => ({ items: [] })) : Promise.resolve({ items: [] })
+  ];
+  const [categories, publicResult, mineResult, favoriteResult] = await Promise.all(requests);
 
   if (!Array.isArray(categories)) throw new Error("API danh mục trả về dữ liệu không hợp lệ.");
-  if (!result || !Array.isArray(result.items)) throw new Error("API tin đăng trả về dữ liệu không hợp lệ.");
+  if (!publicResult || !Array.isArray(publicResult.items)) throw new Error("API tin đăng trả về dữ liệu không hợp lệ.");
 
   CAT_IDS = categories.map(category => category.id);
   CATS.length = 0;
   categories.forEach(category => CATS.push([category.name, EMO[category.slug] || "📦"]));
 
-  L = result.items.map(item => ({
+  // Chỉ dùng dữ liệu từ API; xóa các giao dịch giả đã được lưu từ bản demo cũ.
+  O = [];
+  R = [];
+  RP = [];
+  ORD = [];
+  NOTI = [];
+  S.fav = new Set((favoriteResult.items || []).map(item => item.id));
+
+  const byId = new Map();
+  [...publicResult.items, ...(mineResult.items || [])].forEach(item => byId.set(item.id, item));
+  const allItems = [...byId.values()];
+
+  L = allItems.map(item => ({
     id: item.id,
     t: item.title,
     p: item.price,
@@ -79,10 +95,10 @@ async function loadFromApi() {
     st: STMAP[item.status] || item.status,
     rr: item.reject_reason || "",
     e: EMO[item.category.slug] || "📦",
-    ds: item.description || ""
+    ds: ""
   }));
 
-  result.items.forEach(item => {
+  allItems.forEach(item => {
     U[item.seller.id] = { n: item.seller.full_name, h: "" };
   });
 
