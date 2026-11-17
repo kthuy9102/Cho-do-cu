@@ -67,7 +67,7 @@ addEventListener("unhandledrejection", e => {
 });
 
 const EMO = { "do-dien-tu": "📱", "do-dung-hoc-tap": "✏️", "do-gia-dung": "🍳", "giao-trinh": "📚", "thoi-trang": "🧥" };
-const CONDMAP = { like_new: 0, good: 1, fair: 2 };
+const CONDMAP = { new: 0, like_new: 0, good: 1, fair: 2, poor: 2 };
 const STMAP = { rejected: "hidden", hidden: "hidden" };
 let CAT_IDS = [];
 const img = u => u ? (u.startsWith("http") ? u : API_ORIGIN + u) : null;
@@ -75,11 +75,11 @@ const img = u => u ? (u.startsWith("http") ? u : API_ORIGIN + u) : null;
 function mapListing(x) {
   return {
     id: x.id, t: x.title, p: x.price,
-    c: CAT_IDS.indexOf(x.category?.id),
+    c: Math.max(0, CAT_IDS.indexOf(x.category?.id)),
     k: CONDMAP[x.condition] ?? 1,
     s: x.seller?.id,
     a: Math.max(0, Math.floor((Date.now() - new Date(x.created_at || Date.now())) / 864e5)),
-    n: 1, im: x.thumbnail_url ? [img(x.thumbnail_url)] : null,
+    n: x.images?.length || 1, im: x.images?.length ? x.images.map(i => img(i.url || i.image_url)).filter(Boolean) : (x.thumbnail_url ? [img(x.thumbnail_url)] : null),
     st: STMAP[x.status] || x.status || "pending",
     rr: x.reject_reason || "",
     e: EMO[x.category?.slug] || "📦", ds: x.description || ""
