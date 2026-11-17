@@ -32,6 +32,11 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--create-tables", action="store_true", help="tạo bảng bằng create_all (chỉ dùng khi dev)")
     parser.add_argument("--force", action="store_true", help="cho phép chạy khi ENVIRONMENT=production")
+    parser.add_argument(
+        "--reset-demo-admin",
+        action="store_true",
+        help="tạo hoặc đặt lại admin@example.com / Admin12345 (chỉ dùng môi trường dev)",
+    )
     args = parser.parse_args()
 
     if get_settings().environment == "production" and not args.force:
@@ -41,9 +46,45 @@ def main() -> int:
         Base.metadata.create_all(engine)
 
     with SessionLocal() as db:
-        if db.query(User).first() is not None:
-            print("Đã có dữ liệu, bỏ qua seed.")
+        existing_users = {user.email: user for user in db.query(User).all()}
+        if args.reset_demo_admin and existing_users:
+            email, password, name, role = DEMO_ACCOUNTS[0]
+            admin = existing_users.get(email)
+            if admin is None:
+                admin = User(email=email, full_name=name, role=role)
+                db.add(admin)
+                existing_users[email] = admin
+            admin.hashed_password = hash_password(password)
+            admin.full_name = name
+            admin.role = role
+            admin.is_active = True
+            db.commit()
+            print(f"Đã tạo/đặt lại tài khoản quản trị: {email}")
+        if existing_users:
+            # Database có thể đã có tài khoản sinh viên được tạo trước khi chạy seed.
+            # Bổ sung các tài khoản demo còn thiếu, tuyệt đối không ghi đè mật khẩu/vai trò
+            # của tài khoản đã tồn tại.
+            added = []
+            for email, password, name, role in DEMO_ACCOUNTS:
+                if email not in existing_users:
+                    db.add(
+                        User(
+                            email=email,
+                            hashed_password=hash_password(password),
+                            full_name=name,
+                            role=role,
+                        )
+                    )
+                    added.append(email)
+            db.commit()
+            if added:
+                print("Đã bổ sung tài khoản demo còn thiếu:")
+                for email in added:
+                    print(f"  {email}")
+            else:
+                print("Các tài khoản demo đã tồn tại; không thay đổi dữ liệu.")
             return 0
+
         users = {}
         for email, password, name, role in DEMO_ACCOUNTS:
             user = User(email=email, hashed_password=hash_password(password), full_name=name, role=role)

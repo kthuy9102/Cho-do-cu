@@ -1,5 +1,5 @@
 /* Trang quản trị dành riêng cho kiểm duyệt viên. Dùng chung dữ liệu với trang chợ qua data.js. */
-const ADM=()=>localStorage.getItem(AKEY)==='1';
+const ADM=()=>{try{const u=JSON.parse(localStorage.getItem(AUTH_BUSER_KEY)||'null');return localStorage.getItem(AKEY)==='1'&&!!localStorage.getItem(AUTH_TOKEN_KEY)&&!!u&&['admin','moderator'].includes(String(u.role||'').trim().toLowerCase())}catch(e){return false}};
 let tab='pending';
 getUsers().forEach(u=>U[u.id]={n:u.name,h:'@'+u.email.split('@')[0]});
 const un=id=>U[id]?U[id].n:'Người dùng';
@@ -16,7 +16,32 @@ function loginHtml(){return `<div class="card pad" style="max-width:420px;margin
  <label class="f">Mật khẩu<input id="ap" type="password" autocomplete="current-password" onkeydown="if(event.key==='Enter')adminIn()"></label>
  <span class="err" id="aer"></span><button class="btn" onclick="adminIn()">Đăng nhập</button>
  <a href="index.html" class="mut">← Về trang chợ sinh viên</a></div></div>`}
-function adminIn(){adminLogin($('#ae').value.trim(),$('#ap').value)?render():$('#aer').textContent='Sai email hoặc mật khẩu.'}
+async function adminIn(){
+  const email=$('#ae').value.trim().toLowerCase(), password=$('#ap').value;
+  const btn=$('#app').querySelector('button.btn');
+  const err=$('#aer');
+  err.textContent='';
+  if(btn)btn.disabled=true;
+  try{
+    const result=await login(email,password);
+    if(!result.ok){
+      err.textContent=result.msg||'Đăng nhập thất bại.';
+      return;
+    }
+    const role=String(result.role||'').trim().toLowerCase();
+    if(role!=='admin'&&role!=='moderator'){
+      logout();
+      err.textContent='Tài khoản này không có quyền quản trị.';
+      return;
+    }
+    render();
+  }catch(e){
+    console.error('Lỗi đăng nhập quản trị:',e);
+    err.textContent='Không thể đăng nhập. Vui lòng thử lại.';
+  }finally{
+    if(btn)btn.disabled=false;
+  }
+}
 function dash(){const P=L.filter(l=>l.st==='pending'),Rp=RP.filter(x=>x.open),A=L.filter(l=>l.st!=='pending');
   const T=[['pending',`Tin chờ duyệt (${P.length})`],['reports',`Báo cáo vi phạm (${Rp.length})`],['all',`Tất cả tin (${A.length})`]];
   let h=`<div class="card tabs">${T.map(t=>`<button class="tab ${tab===t[0]?'on':''}" onclick="tab='${t[0]}';render()">${t[1]}</button>`).join('')}</div><div class="card">`;

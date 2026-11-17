@@ -2,7 +2,10 @@
 const UKEY='cdcsv_users',SKEY='cdcsv_session',AKEY='cdcsv_admin';
 const GOOGLE_CLIENT_ID=''; // Dán Client ID lấy từ Google Cloud Console vào đây để dùng đăng nhập Google thật
 const ADMIN={email:'admin@demo.vn',pw:'admin123'};
-const AUTH_API=(location.port==="5500"?"http://localhost:8001":"")+"/api/v1",AUTH_TOKEN_KEY="cdcsv_token",AUTH_BUSER_KEY="cdcsv_buser";
+// Docker/Nginx cùng origin: /api/v1 được proxy tới FastAPI trong mạng Compose.
+const AUTH_API="/api/v1";
+const AUTH_TOKEN_KEY="cdcsv_token";
+const AUTH_BUSER_KEY="cdcsv_buser";
 
 async function sha(p){
   try{const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode('cdcsv:'+p));return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('')}
