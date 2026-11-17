@@ -117,10 +117,35 @@ async function loadFromApi() {
     U[item.buyer.id] = { ...(U[item.buyer.id] || {}), n: item.buyer.full_name, h: "" };
   });
 
-  const sellerIds = [...new Set(allItems.map(item => item.seller.id))];
-  const reviewPages = await Promise.all(sellerIds.map(id =>
-    api(`/users/${id}/reviews?page=1&page_size=100`).catch(() => ({ items: [] }))
-  ));
+  // Bổ sung các tin đã bán trong đề nghị đã chấp nhận để người mua vẫn xem được lịch sử giao dịch.
+  offers.forEach(item => {
+    const listing = item.listing;
+    if (!L.some(existing => existing.id === listing.id)) {
+      L.push({
+        id: listing.id, t: listing.title, p: listing.price, c: -1, k: 1,
+        s: listing.seller_id, a: 0, n: 1, im: null,
+        st: STMAP[listing.status] || listing.status, rr: "", e: "📦", ds: ""
+      });
+    }
+  });
+
+  const sellerIds = [...new Set([
+    ...allItems.map(item => item.seller.id),
+    ...offers.map(item => item.listing.seller_id)
+  ])];
+  const [profiles, reviewPages] = await Promise.all([
+    Promise.all(sellerIds.map(id => api(`/users/${id}`).catch(() => null))),
+    Promise.all(sellerIds.map(id => api(`/users/${id}/reviews?page=1&page_size=100`).catch(() => ({ items: [] }))))
+  ]);
+  profiles.filter(Boolean).forEach(profile => {
+    U[profile.id] = {
+      ...(U[profile.id] || {}),
+      n: profile.full_name,
+      h: "",
+      rating_avg: profile.rating_avg,
+      review_count: profile.review_count
+    };
+  });
   const reviews = reviewPages.flatMap(page => page.items || []);
   R = reviews.map(review => {
     const offer = offerById.get(review.offer_id);
