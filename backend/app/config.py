@@ -5,7 +5,14 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    """Toàn bộ cấu hình/bí mật đọc từ biến môi trường hoặc file .env."""
+    """Cấu hình ứng dụng.
+
+    Các biến bắt buộc khi khởi động:
+    - DATABASE_URL: chuỗi kết nối PostgreSQL.
+    - JWT_SECRET_KEY: khóa ký JWT ngẫu nhiên, tối thiểu 32 ký tự.
+
+    Có thể khai báo các giá trị trong file .env hoặc biến môi trường.
+    """
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
