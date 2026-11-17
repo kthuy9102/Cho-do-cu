@@ -4,7 +4,7 @@ const SKEY = "cdcsv_session";
 const AKEY = "cdcsv_admin";
 const GOOGLE_CLIENT_ID = "";
 const AUTH_API_ORIGIN = location.port === "5500"
-  ? `${location.protocol}//${location.hostname}:8001`
+  ? \`\${location.protocol}//\${location.hostname}:8001\`
   : "";
 const AUTH_API = AUTH_API_ORIGIN + "/api/v1";
 const AUTH_TOKEN_KEY = "cdcsv_token";
@@ -43,13 +43,13 @@ async function register(values) {
   const name = (values.name || "").trim();
   const email = (values.email || "").trim().toLowerCase();
   const studentId = (values.mssv || "").trim();
-  const phone = (values.phone || "").replace(/\\s/g, "");
+  const phone = (values.phone || "").replace(/\s/g, "");
 
   if (name.length < 2) errors.name = "Nhập họ và tên (ít nhất 2 ký tự).";
   if (!/^[A-Za-z0-9]{6,12}$/.test(studentId)) errors.mssv = "MSSV gồm 6–12 chữ hoặc số.";
-  if (!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)) errors.email = "Email không hợp lệ.";
-  if (phone && !/^(0|\\+84)\\d{9}$/.test(phone)) errors.phone = "Số điện thoại không hợp lệ.";
-  if (!values.pw || values.pw.length < 8 || !/[A-Za-z]/.test(values.pw) || !/\\d/.test(values.pw)) {
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) errors.email = "Email không hợp lệ.";
+  if (phone && !/^(0|\+84)\d{9}$/.test(phone)) errors.phone = "Số điện thoại không hợp lệ.";
+  if (!values.pw || values.pw.length < 8 || !/[A-Za-z]/.test(values.pw) || !/\d/.test(values.pw)) {
     errors.pw = "Mật khẩu ít nhất 8 ký tự, gồm cả chữ và số.";
   }
   if (values.pw2 !== values.pw) errors.pw2 = "Mật khẩu nhập lại không khớp.";
@@ -74,8 +74,7 @@ async function register(values) {
 
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
-    const message = apiErrorMessage(data, "Không thể tạo tài khoản.");
-    return { ok: false, errors: { email: message } };
+    return { ok: false, errors: { email: apiErrorMessage(data, "Không thể tạo tài khoản.") } };
   }
 
   // API đăng ký không tự cấp token: đăng nhập ngay bằng tài khoản vừa tạo.
