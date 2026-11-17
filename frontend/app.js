@@ -298,7 +298,7 @@ document.addEventListener('click',e=>{if(!e.target.closest('.um'))closeUM()});
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeUM()});
 function openProfile(){const m=me();
  openDlg(`${dh('Thông tin tài khoản')}<div class="db"><div class="sel"><div class="av lg" style="text-transform:uppercase">${esc(CUR.name[0])}</div><div><b>${esc(CUR.name)}</b><div class="mut">${repTxt(m)}</div></div></div>
- <div class="two"><label class="f" id="pf_name">Họ và tên<input id="pfn" maxlength="60" value="${esc(CUR.name)}"><span class="err"></span></label><label class="f" id="pf_phone">Số điện thoại<input id="pfp" type="tel" maxlength="15" value="${esc(CUR.phone||'')}"><span class="err"></span></label></div>
+ <label class="f" id="pf_name">Họ và tên<input id="pfn" maxlength="100" value="${esc(CUR.name)}"><span class="err"></span></label>
  <div class="two"><label class="f">Email<input value="${esc(CUR.email)}" disabled></label><label class="f">Mã sinh viên<input value="${esc(CUR.mssv||'Chưa cập nhật')}" disabled></label></div>
  <div class="mut">Tin đã đăng: <b>${L.filter(l=>l.s===m).length}</b> · Đơn mua: <b>${ORD.filter(o=>o.b===m).length}</b> · Đơn bán: <b>${ORD.filter(o=>o.s===m).length}</b></div>
  <button class="btn" onclick="saveProfile()">Lưu thay đổi</button></div>`)}
