@@ -113,6 +113,12 @@ def my_listings(
 )
 def create_listing(payload: ListingCreate, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     settings = get_settings()
+
+    # Serialize việc đăng tin theo từng tài khoản. PostgreSQL giữ khóa dòng users
+    # đến khi transaction commit, nên request thứ hai sẽ COUNT sau khi request đầu
+    # đã ghi xong, tránh vượt MAX_LISTINGS_PER_DAY khi có request đồng thời.
+    db.scalar(select(User.id).where(User.id == user.id).with_for_update())
+
     since = datetime.now(timezone.utc) - timedelta(hours=24)
     posted_today = db.scalar(
         select(func.count(Listing.id)).where(Listing.seller_id == user.id, Listing.created_at >= since)

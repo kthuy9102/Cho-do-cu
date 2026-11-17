@@ -16,6 +16,7 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
     func,
+    text,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -148,6 +149,16 @@ class Offer(Base):
     __table_args__ = (
         CheckConstraint("amount > 0", name="ck_offers_amount_positive"),
         Index("ix_offers_listing_status", "listing_id", "status"),
+        # Chỉ cho phép một offer đang chờ trên mỗi cặp người mua/tin đăng.
+        # Partial unique index vẫn giữ được lịch sử offer đã rejected/cancelled.
+        Index(
+            "uq_offers_one_pending_per_buyer_listing",
+            "listing_id",
+            "buyer_id",
+            unique=True,
+            postgresql_where=text("status = 'pending'"),
+            sqlite_where=text("status = 'pending'"),
+        ),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
