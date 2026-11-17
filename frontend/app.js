@@ -419,7 +419,7 @@ mineHtml = function () {
   document.head.appendChild(s);
 })();
 
-let RV = { l: 0, star: 0 };
+let RV = { l: 0, offer: 0, star: 0 };
 const RVTXT = ['Chọn số sao', 'Tệ', 'Chưa tốt', 'Bình thường', 'Tốt', 'Rất tốt'];
 
 // Chỉ người MUA của tin đã bán (đề nghị được chấp nhận, hoặc đơn đã nhận hàng) và chưa đánh giá mới được đánh giá
@@ -462,7 +462,9 @@ function starBtns(n) {
 function openReview(lid) {
   const l = L.find(x => x.id === lid);
   if (!canReview(l)) return toast('Bạn chưa thể đánh giá giao dịch này.');
-  RV = { l: lid, star: 0 };
+  const accepted = O.find(o => o.l === lid && o.f === me() && o.st === 'accepted');
+  if (!accepted) return toast('Không tìm thấy đề nghị đã được chấp nhận để đánh giá.');
+  RV = { l: lid, offer: accepted.id, star: 0 };
   openDlg(`${dh('Đánh giá người bán')}<div class="db">
    <div class="sel"><div class="av">${esc(nm(l.s)[0])}</div><div><b>${esc(nm(l.s))}</b><div class="mut">Giao dịch: ${esc(l.t)}</div></div></div>
    <div class="f" id="rvf1">Mức độ hài lòng *<div id="rvst">${starBtns(0)}</div><span class="mut" id="rvlb">${RVTXT[0]}</span><span class="err"></span></div>
@@ -470,7 +472,7 @@ function openReview(lid) {
    <button class="btn" onclick="submitRv()">Gửi đánh giá</button></div>`);
 }
 function pickStar(n) { RV.star = n; $('#rvst').innerHTML = starBtns(n); $('#rvlb').textContent = RVTXT[n]; }
-function submitRv() {
+async function submitRv() {
   const l = L.find(x => x.id === RV.l);
   const bad = (id, m) => { const f = $('#' + id); f.classList.add('bad'); f.querySelector('.err').textContent = m; return 1; };
   ['rvf1', 'rvf2'].forEach(i => { $('#' + i).classList.remove('bad'); $('#' + i).querySelector('.err').textContent = ''; });
@@ -479,13 +481,17 @@ function submitRv() {
   if (!RV.star) e += bad('rvf1', 'Vui lòng chọn số sao từ 1 đến 5.');
   if (x.length < 3) e += bad('rvf2', 'Nhận xét cần ít nhất 3 ký tự.');
   if (e) return;
-  if (!canReview(l)) return toast('Bạn không thể đánh giá giao dịch này (403).');
-  R.push({ l: l.id, to: l.s, f: me(), star: RV.star, x, t: Date.now() });
-  ORD.forEach(o => { if (o.l === l.id && o.b === me()) o.rv = true; });
-  notify(l.s, `${nm(me())} đã đánh giá bạn ${RV.star} sao cho "${l.t}"`, 'home', '⭐');
-  $('#dlg').close();
-  toast('Cảm ơn bạn đã đánh giá người bán.');
-  refresh(true);
+  if (!l || !RV.offer) return toast('Không tìm thấy giao dịch hợp lệ để đánh giá.');
+  try {
+    await api('/offers/' + RV.offer + '/review', {
+      method: 'POST',
+      body: JSON.stringify({ rating: RV.star, comment: x })
+    });
+    $('#dlg').close();
+    toast('Đã gửi đánh giá lên máy chủ.');
+    await loadFromApi();
+    refresh(true);
+  } catch (err) { toast(err.message); }
 }
 // Nút "Đánh giá" ở trang Đơn hàng cũng dùng form mới
 reviewForm = function (oid) { const o = ORD.find(x => x.id === oid); if (o) openReview(o.l); };
@@ -621,7 +627,7 @@ submitPost = async function () {
 
 
 
-/* ===== TỰ CẬP NHẬT DỮ LIỆU TỪ BACKEND (2 giây) ===== */
+/* ===== TỰ CẬP NHẬT DỮ LIỆU TỪ BACKEND (30 giây) ===== */
 let syncing = false;
 async function autoSync() {
   if (syncing || document.hidden || posting) return;
@@ -631,5 +637,5 @@ async function autoSync() {
   try { await loadFromApi(); refresh(); } catch (e) { /* lần sau thử lại */ }
   finally { syncing = false; }
 }
-setInterval(autoSync, 2000);
+setInterval(autoSync, 30000);
 document.addEventListener('visibilitychange', () => { if (!document.hidden) autoSync(); });
