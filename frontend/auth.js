@@ -185,7 +185,10 @@ async function login(email, pw) {
 
     } catch (e) {
         console.error('Lỗi xử lý đăng nhập:', e);
-        return { ok: false, msg: 'Không đọc được dữ liệu đăng nhập từ backend.' };
+        sessionStorage.removeItem(AUTH_TOKEN_KEY);
+        sessionStorage.removeItem(AUTH_BUSER_KEY);
+        sessionStorage.removeItem(AKEY);
+        return { ok: false, msg: e.message || 'Không đọc được dữ liệu đăng nhập từ backend.' };
     }
 }
 
