@@ -126,6 +126,18 @@ async function loadFromApi() {
     const offers = [...(sent.items || []), ...(received.items || [])];
     O = [...new Map(offers.map(x => [x.id, x])).values()].map(mapOffer);
     S.fav = new Set((favorites.items || []).map(x => x.id));
+
+    const sellerIds = [...new Set(L.map(x => x.s).filter(Boolean))];
+    const reviewPages = await Promise.all(sellerIds.map(id =>
+      apiQuiet("/users/" + id + "/reviews?page_size=100").catch(e => {
+        console.warn("Reviews for seller " + id + ":", e.message); return { items: [] };
+      })
+    ));
+    R = reviewPages.flatMap(page => (page.items || []).map(x => ({
+      l: (O.find(o => o.id === x.offer_id) || {}).l || null,
+      offer_id: x.offer_id, to: x.seller_id, f: x.reviewer?.id,
+      star: x.rating, x: x.comment || ""
+    })));
   } else {
     O = [];
     S.fav = new Set();
