@@ -111,12 +111,13 @@ def transition_order(db: Session, order_id: int, action: str, user: User) -> Ord
                f"Người mua đã xác nhận hoàn tất đơn #{order.id}.", actor_id=user.id,
                resource_type="order", resource_id=order.id)
     elif action == "cancel":
-        if order.status != OrderStatus.confirmed:
+        if order.status not in (OrderStatus.pending, OrderStatus.confirmed):
             raise ConflictError("Chỉ có thể hủy đơn trước khi người bán giao hàng", code="order_invalid_state")
+        was_confirmed = order.status == OrderStatus.confirmed
         order.status = OrderStatus.cancelled
         listing = db.scalar(select(Listing).where(Listing.id == order.listing_id).with_for_update())
         offer = db.get(Offer, order.offer_id)
-        if listing is not None and listing.status == ListingStatus.sold:
+        if was_confirmed and listing is not None and listing.status == ListingStatus.sold:
             listing.status = ListingStatus.approved
         if offer is not None and offer.status in (OfferStatus.pending, OfferStatus.accepted):
             offer.status = OfferStatus.cancelled
