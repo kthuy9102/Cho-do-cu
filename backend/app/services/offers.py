@@ -85,6 +85,16 @@ def accept_offer(db: Session, offer_id: int, seller: User) -> Offer:
         db.rollback()
         raise ConflictError("Tin đăng không còn ở trạng thái đang bán", code="listing_not_available")
 
+    if db.scalar(select(Order.id).where(Order.offer_id == offer.id)):
+        db.rollback()
+        raise ConflictError("Đề nghị này đã được gửi thành đơn hàng; hãy xử lý trong mục Đơn hàng", code="offer_has_order")
+    active_order = db.scalar(select(Order.id).where(
+        Order.listing_id == listing.id, Order.status.in_([OrderStatus.pending, OrderStatus.confirmed, OrderStatus.shipped])
+    ).limit(1))
+    if active_order:
+        db.rollback()
+        raise ConflictError("Tin đang có đơn hàng khác chờ xử lý", code="listing_has_active_order")
+
     offer.status = OfferStatus.accepted
     listing.status = ListingStatus.sold
     order = Order(offer_id=offer.id, listing_id=listing.id, buyer_id=offer.buyer_id,
