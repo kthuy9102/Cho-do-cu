@@ -84,3 +84,50 @@ def test_notification_endpoints_require_authentication(client):
     assert client.get(f"{API}/notifications").status_code == 401
     assert client.get(f"{API}/notifications/unread-count").status_code == 401
     assert client.post(f"{API}/notifications/read-all").status_code == 401
+
+
+def test_direct_purchase_requires_seller_confirmation_and_persists_delivery(client, alice, bob, carol, listing, login, db):
+    seller, buyer, outsider = login(alice.email), login(bob.email), login(carol.email)
+    payload = {
+        "delivery_name": "Nguyen Van B",
+        "delivery_phone": "0912345678",
+        "delivery_address": "Cong chinh truong Dai hoc",
+        "payment_method": "COD",
+        "note": "Gọi trước khi giao",
+    }
+    created = client.post(f"{API}/listings/{listing.id}/orders", json=payload, headers=buyer)
+    assert created.status_code == 201, created.text
+    data = created.json()
+    assert data["status"] == "pending"
+    assert data["delivery_phone"] == payload["delivery_phone"]
+    assert data["delivery_address"] == payload["delivery_address"]
+    assert data["offer_id"] is not None
+
+    duplicate = client.post(f"{API}/listings/{listing.id}/orders", json=payload, headers=outsider)
+    assert duplicate.status_code == 409
+    assert client.post(f"{API}/orders/{data['id']}/confirm", headers=buyer).status_code == 404
+    assert client.post(f"{API}/orders/{data['id']}/confirm", headers=outsider).status_code == 404
+
+    confirmed = client.post(f"{API}/orders/{data['id']}/confirm", headers=seller)
+    assert confirmed.status_code == 200 and confirmed.json()["status"] == "confirmed"
+    db.expire_all()
+    assert db.get(Listing, listing.id).status == ListingStatus.sold
+
+    cancelled = client.post(f"{API}/orders/{data['id']}/cancel", headers=buyer)
+    assert cancelled.status_code == 200 and cancelled.json()["status"] == "cancelled"
+
+
+def test_direct_order_can_be_cancelled_before_confirmation(client, alice, bob, listing, login, db):
+    payload = {
+        "delivery_name": "Nguyen Van B",
+        "delivery_phone": "0912345678",
+        "delivery_address": "Cong chinh truong Dai hoc",
+        "payment_method": "Gặp trực tiếp",
+    }
+    created = client.post(f"{API}/listings/{listing.id}/orders", json=payload, headers=login(bob.email))
+    assert created.status_code == 201, created.text
+    order_id = created.json()["id"]
+    cancelled = client.post(f"{API}/orders/{order_id}/cancel", headers=login(bob.email))
+    assert cancelled.status_code == 200 and cancelled.json()["status"] == "cancelled"
+    db.expire_all()
+    assert db.get(Listing, listing.id).status == ListingStatus.approved
