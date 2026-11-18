@@ -15,6 +15,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY app ./app
 COPY scripts ./scripts
+COPY alembic.ini ./alembic.ini
+COPY migrations ./migrations
 
 RUN useradd --create-home --uid 10001 appuser \
     && mkdir -p /app/uploads \
