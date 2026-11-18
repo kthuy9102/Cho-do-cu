@@ -137,8 +137,8 @@ async function setOrd(id,st,msg,who){
  }catch(err){toast(err.message);return false}
 }
 function reviewForm(oid){openDlg(`${dh('Đánh giá người bán')}<div class="db"><div class="two"><label class="f">Số sao<select id="ors"><option value="5">5 ★ Rất tốt</option><option value="4">4 ★ Tốt</option><option value="3">3 ★ Bình thường</option><option value="2">2 ★ Chưa tốt</option><option value="1">1 ★ Tệ</option></select></label><label class="f">Nhận xét<input id="orx" maxlength="200" placeholder="Giao hàng đúng hẹn, đồ đẹp..."></label></div><button class="btn" onclick="submitReview(${oid})">Gửi đánh giá</button></div>`)}
-function submitReview(oid){const o=ORD.find(x=>x.id===oid);if(!o||o.b!==me()||o.st!=='done'||o.rv)return toast('Không thể đánh giá đơn này.');
- R.push({l:o.l,to:o.s,f:me(),star:+$('#ors').value,x:$('#orx').value.trim()||'Không có nhận xét'});o.rv=true;notify(o.s,`${nm(me())} đã đánh giá bạn ${R[R.length-1].star} sao cho đơn #${o.code}`,'orders:sell','⭐');$('#dlg').close();toast('Cảm ơn bạn đã đánh giá người bán.');refresh(true)}
+async function submitReview(oid){const o=ORD.find(x=>x.id===oid);if(!o||o.b!==me()||o.st!=='done'||o.rv||!o.offer_id)return toast('Không thể đánh giá đơn này.');
+ try{await api('/offers/'+o.offer_id+'/review',{method:'POST',body:JSON.stringify({rating:+$('#ors').value,comment:$('#orx').value.trim()||null})});await loadFromApi();$('#dlg').close();toast('Cảm ơn bạn đã đánh giá người bán.');refresh(true)}catch(e){toast(e.message)}}
 
 // FORM ĐIỀN THÔNG TIN ĐẶT MUA & GIAO HÀNG
 function openBuyForm(id){
