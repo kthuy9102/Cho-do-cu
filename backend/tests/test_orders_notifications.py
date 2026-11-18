@@ -4,6 +4,11 @@ from app.models import Listing, ListingStatus, Order, OrderStatus
 API = "/api/v1"
 
 
+@pytest.fixture()
+def listing(alice, category, make_listing):
+    return make_listing(alice, category)
+
+
 def make_offer(client, listing_id, headers):
     return client.post(
         f"{API}/listings/{listing_id}/offers",
