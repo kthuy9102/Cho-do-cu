@@ -14,7 +14,7 @@ from app.core.error_handlers import register_exception_handlers
 from app.core.logging_config import setup_logging
 from app.core.middleware import RequestLoggingMiddleware
 from app.database import get_db
-from app.routers import auth, categories, favorites, listings, moderation, offers, reports, reviews, users
+from app.routers import auth, categories, favorites, listings, moderation, notifications, offers, orders, reports, reviews, users
 
 settings = get_settings()
 setup_logging(settings.log_level, settings.log_json)
@@ -28,6 +28,8 @@ TAGS = [
     {"name": "Categories", "description": "Danh mục sản phẩm"},
     {"name": "Listings", "description": "Tin đăng: tìm kiếm, lọc, phân trang, upload ảnh"},
     {"name": "Offers", "description": "Đề nghị mua và chấp nhận/từ chối"},
+    {"name": "Orders", "description": "Theo dõi đơn mua, đơn bán và trạng thái giao dịch"},
+    {"name": "Notifications", "description": "Thông báo cá nhân, trạng thái đã đọc/chưa đọc"},
     {"name": "Reviews", "description": "Đánh giá người bán sau giao dịch"},
     {"name": "Reports", "description": "Báo cáo tin vi phạm"},
     {"name": "Favorites", "description": "Danh sách yêu thích"},
@@ -68,7 +70,7 @@ app.add_middleware(
 
 register_exception_handlers(app)
 
-for module in (auth, users, categories, listings, offers, reviews, reports, favorites, moderation):
+for module in (auth, users, categories, listings, offers, orders, notifications, reviews, reports, favorites, moderation):
     app.include_router(module.router, prefix=settings.api_prefix)
 
 app.mount("/media", StaticFiles(directory=settings.upload_dir), name="media")
