@@ -53,7 +53,8 @@ class OfferStatus(str, enum.Enum):
 
 
 class OrderStatus(str, enum.Enum):
-    confirmed = "confirmed"  # người bán đã chấp nhận đề nghị
+    pending = "pending"      # chờ người bán xác nhận
+    confirmed = "confirmed"  # người bán đã xác nhận
     shipped = "shipped"      # người bán đã gửi/giao hàng
     completed = "completed"  # người mua xác nhận hoàn tất
     cancelled = "cancelled"  # hủy trước khi giao
@@ -244,12 +245,17 @@ class Order(Base):
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    offer_id: Mapped[int] = mapped_column(ForeignKey("offers.id"), unique=True, index=True)
+    offer_id: Mapped[int | None] = mapped_column(ForeignKey("offers.id"), unique=True, index=True, nullable=True)
     listing_id: Mapped[int] = mapped_column(ForeignKey("listings.id"), index=True)
     buyer_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
     seller_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
     amount: Mapped[int] = mapped_column(BigInteger)
-    status: Mapped[OrderStatus] = mapped_column(_enum(OrderStatus), default=OrderStatus.confirmed, index=True)
+    delivery_name: Mapped[str | None] = mapped_column(String(100))
+    delivery_phone: Mapped[str | None] = mapped_column(String(20))
+    delivery_address: Mapped[str | None] = mapped_column(String(500))
+    payment_method: Mapped[str | None] = mapped_column(String(60))
+    note: Mapped[str | None] = mapped_column(String(500))
+    status: Mapped[OrderStatus] = mapped_column(_enum(OrderStatus), default=OrderStatus.pending, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
