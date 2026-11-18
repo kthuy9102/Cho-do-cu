@@ -73,16 +73,23 @@ Yêu cầu: Docker Desktop dùng Linux containers và Docker Compose v2.
 
 ## Kiểm thử
 
-Tại thư mục gốc:
+Kiểm thử Backend (PowerShell, cần Python 3.12):
 
 ```powershell
-docker compose exec backend pytest --cov=app --cov-report=term-missing
-docker compose exec backend ruff check app tests scripts
+cd backend
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install -r requirements-dev.txt
+ruff check app tests scripts
+pytest --cov=app --cov-report=term-missing
+deactivate
+cd ..
 ```
 
-Kiểm thử Frontend (cần Node.js 22):
+Kiểm thử Frontend (cần Node.js 22, chạy tại thư mục gốc):
 
 ```powershell
+node --check frontend\app.js
 node --test frontend/tests/*.test.js
 ```
 
