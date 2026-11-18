@@ -28,7 +28,7 @@ class OrderCreate(BaseModel):
     @field_validator("delivery_phone")
     @classmethod
     def clean_phone(cls, value: str) -> str:
-        value = re.sub(r"\\s+", "", value)
+        value = re.sub(r"\s+", "", value)
         if not re.fullmatch(r"0[0-9]{8,10}", value):
             raise ValueError("Số điện thoại phải gồm 9-11 chữ số và bắt đầu bằng 0")
         return value
