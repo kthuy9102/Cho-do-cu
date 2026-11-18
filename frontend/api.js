@@ -97,6 +97,34 @@ function mapOffer(x) {
   };
 }
 
+
+const ORDER_STMAP = { pending: "pending", confirmed: "confirmed", shipped: "shipping", completed: "done", cancelled: "cancelled" };
+function mapOrder(x) {
+  const created = new Date(x.created_at || Date.now()).getTime();
+  const updated = new Date(x.updated_at || x.created_at || Date.now()).getTime();
+  const ts = { pending: created };
+  if (x.status === "confirmed") ts.confirmed = updated;
+  if (x.status === "shipped") { ts.confirmed = created; ts.shipping = updated; }
+  if (x.status === "completed") { ts.confirmed = created; ts.shipping = created; ts.done = updated; }
+  if (x.status === "cancelled") ts.cancelled = updated;
+  return {
+    id: x.id, code: "DH" + String(x.id).padStart(6, "0"),
+    offer_id: x.offer_id, l: x.listing?.id, b: x.buyer?.id, s: x.seller?.id,
+    p: x.amount, name: x.delivery_name || x.buyer?.full_name || "",
+    phone: x.delivery_phone || "", addr: x.delivery_address || "",
+    pay: x.payment_method || "Thỏa thuận trực tiếp", note: x.note || "",
+    st: ORDER_STMAP[x.status] || x.status, ts, eta: updated + 2 * 864e5, rv: false
+  };
+}
+function mapNotification(x) {
+  const link = x.resource_type === "order" ? "orders:buy" :
+    x.event_type === "offer_received" ? "mine" : "orders:buy";
+  let userId = null;
+  try { userId = JSON.parse(sessionStorage.getItem("cdcsv_buser") || "null")?.id ?? null; } catch (_) {}
+  return { id: x.id, to: userId, t: x.title + (x.body ? " · " + x.body : ""),
+    link, ic: "🔔", ts: new Date(x.created_at || Date.now()).getTime(), read: !!x.read_at };
+}
+
 async function loadFromApi() {
   const rc = await api("/categories");
   const cats = Array.isArray(rc) ? rc : rc.items;
@@ -106,9 +134,6 @@ async function loadFromApi() {
 
   const rl = await api("/listings?page_size=100");
   L = rl.items.map(mapListing);
-  // Backend chưa có Orders/Notifications API: không hiển thị dữ liệu demo/local như dữ liệu thật.
-  ORD = [];
-  NOTI = [];
   RP = [];
   rl.items.forEach(x => { if (x.seller) U[x.seller.id] = { n: x.seller.full_name, h: "" }; });
 
@@ -122,13 +147,17 @@ async function loadFromApi() {
       if (x.seller) U[x.seller.id] = U[x.seller.id] || { n: x.seller.full_name, h: "" };
     });
 
-    const [sent, received, favorites] = await Promise.all([
+    const [sent, received, favorites, orders, notifications] = await Promise.all([
       apiQuiet("/offers/sent?page_size=100").catch(e => { console.warn("Offers sent:", e.message); return { items: [] }; }),
       apiQuiet("/offers/received?page_size=100").catch(e => { console.warn("Offers received:", e.message); return { items: [] }; }),
-      apiQuiet("/favorites?page_size=100").catch(e => { console.warn("Favorites:", e.message); return { items: [] }; })
+      apiQuiet("/favorites?page_size=100").catch(e => { console.warn("Favorites:", e.message); return { items: [] }; }),
+      apiQuiet("/orders?page_size=100"),
+      apiQuiet("/notifications?page_size=100")
     ]);
     const offers = [...(sent.items || []), ...(received.items || [])];
     O = [...new Map(offers.map(x => [x.id, x])).values()].map(mapOffer);
+    ORD = (orders.items || []).map(mapOrder);
+    NOTI = (notifications.items || []).map(mapNotification);
     S.fav = new Set((favorites.items || []).map(x => x.id));
 
     const sellerIds = [...new Set(L.map(x => x.s).filter(Boolean))];
