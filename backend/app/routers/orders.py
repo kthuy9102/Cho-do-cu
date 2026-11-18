@@ -2,7 +2,6 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
-from app.core.exceptions import ConflictError
 from app.core.pagination import PageParams, make_page, paginate
 from app.database import get_db
 from app.models import Order, User
@@ -39,7 +38,13 @@ def order_detail(order_id: int, user: User = Depends(get_current_user), db: Sess
     return get_order(db, order_id, user)
 
 
-@router.post("/orders/{order_id}/confirm", response_model=OrderRead, summary="Người bán xác nhận đơn mua",\n             responses=error_responses(401, 403, 404, 409))\ndef confirm_order(order_id: int, user: User = Depends(get_current_user), db: Session = Depends(get_db)):\n    return transition_order(db, order_id, "confirm", user)\n\n\n@router.post("/orders/{order_id}/ship", response_model=OrderRead, summary="Người bán xác nhận đã giao hàng",
+@router.post("/orders/{order_id}/confirm", response_model=OrderRead, summary="Người bán xác nhận đơn mua",
+             responses=error_responses(401, 403, 404, 409))
+def confirm_order(order_id: int, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    return transition_order(db, order_id, "confirm", user)
+
+
+@router.post("/orders/{order_id}/ship", response_model=OrderRead, summary="Người bán xác nhận đã giao hàng",
              responses=error_responses(401, 403, 404, 409))
 def ship_order(order_id: int, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     return transition_order(db, order_id, "ship", user)
