@@ -330,7 +330,7 @@ async function openNoti(id){const n=NOTI.find(x=>x.id===id);if(!n||n.to!==me())r
 document.addEventListener('click',e=>{if(!e.target.closest('.bl'))closeBell()});
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeBell()});
 addEventListener('storage',e=>{if(e.key===KEY&&CUR)side()});
-if(CUR&&!localStorage.getItem('cdcsv_wl_'+me())){notify(me(),'Chào mừng bạn đến với Chợ đồ cũ sinh viên! Hãy đăng tin hoặc đặt mua món đầu tiên.','home','👋');localStorage.setItem('cdcsv_wl_'+me(),'1');save();side()}
+// Không tự tạo thông báo giả trong localStorage; thông báo nghiệp vụ phải đến từ Backend.
 
 
 /* extras.js – bổ sung cho trang chợ (index.html). Nạp SAU app.js. */
