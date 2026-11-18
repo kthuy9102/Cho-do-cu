@@ -647,7 +647,7 @@ let admCats = [], admState = 0, admError = '';   // 0 chưa tải, 1 đang tải
 const isAdm = () => sessionStorage.getItem(AKEY) === '1' && !!sessionStorage.getItem(AUTH_TOKEN_KEY);
 
 adminLogin = () => false;          // bỏ tài khoản cứng: bắt buộc đăng nhập qua backend
-adminLogout = function () { logout(); admState = 0; };
+adminLogout = function () { logout(); admState = 0; tab = 'pending'; admUsers = []; };
 
 async function admFetch(path, opt = {}) {
   const h = { Authorization: 'Bearer ' + sessionStorage.getItem(AUTH_TOKEN_KEY) };
