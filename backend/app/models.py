@@ -89,7 +89,6 @@ class User(Base):
     role: Mapped[Role] = mapped_column(_enum(Role), default=Role.student)
     is_active: Mapped[bool] = mapped_column(default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-    actor: Mapped[Optional[User]] = relationship(foreign_keys=[actor_id])
 
     listings: Mapped[list["Listing"]] = relationship(back_populates="seller")
 
@@ -275,3 +274,5 @@ class Notification(Base):
     resource_id: Mapped[int | None] = mapped_column(Integer)
     read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    actor: Mapped[Optional[User]] = relationship(foreign_keys=[actor_id])
