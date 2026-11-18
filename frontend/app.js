@@ -122,19 +122,20 @@ function askDlg(title,msg,yes,fn){window._ask=fn;openDlg(`${dh(title)}<div class
 function askCancel(id){askDlg('Hủy đơn hàng?','Bạn chắc chắn muốn hủy đơn này? Sản phẩm sẽ được mở bán lại.','Hủy đơn',()=>setOrd(id,'cancelled','Đã hủy đơn hàng.','b'))}
 function askRefuse(id){askDlg('Từ chối đơn hàng?','Người mua sẽ được báo là đơn đã bị hủy và sản phẩm được mở bán lại.','Từ chối',()=>setOrd(id,'cancelled','Đã từ chối đơn hàng.','s'))}
 function sellerStep(id,st){setOrd(id,st,st==='confirmed'?'Đã xác nhận đơn. Hãy chuẩn bị hàng.':'Đã chuyển sang đang giao hàng.','s')}
-function receiveOrder(id){setOrd(id,'done','Cảm ơn bạn! Đơn hàng đã hoàn tất.','b');reviewForm(id)}
-function setOrd(id,st,msg,who){const o=ORD.find(x=>x.id===id),now=Date.now();
+async function receiveOrder(id){const ok=await setOrd(id,'done','Cảm ơn bạn! Đơn hàng đã hoàn tất.','b');if(ok)reviewForm(id)}
+async function setOrd(id,st,msg,who){
+ const o=ORD.find(x=>x.id===id);
  if(!CUR||!o||(who==='b'?o.b:o.s)!==me())return toast('Bạn không có quyền thao tác đơn này (403).');
- const ok={cancelled:who==='b'?o.st==='pending':o.st==='pending',confirmed:o.st==='pending',shipping:o.st==='confirmed',done:o.st==='shipping'}[st];
- if(!ok)return toast('Đơn hàng không còn ở trạng thái phù hợp để thao tác.');
- o.st=st;o.ts[st]=now;if(st==='cancelled')o.by=who==='b'?'buyer':'seller';if(st==='confirmed')o.eta=etaFor(o.pay,now);
- if(st==='cancelled'){const l=L.find(x=>x.id===o.l);if(l&&l.st==='sold'&&!ORD.some(x=>x.l===o.l&&x.id!==o.id&&x.st!=='cancelled'))l.st='approved'}
- {const ll=L.find(x=>x.id===o.l),tt=ll?ll.t:'sản phẩm';
-  if(st==='confirmed')notify(o.b,`Đơn #${o.code} (${tt}) đã được xác nhận. Dự kiến giao ${fd(o.eta)}`,'orders:buy','✅');
-  if(st==='shipping')notify(o.b,`Đơn #${o.code} (${tt}) đang được giao đến bạn`,'orders:buy','🚚');
-  if(st==='done')notify(o.s,`${nm(o.b)} đã nhận hàng. Đơn #${o.code} hoàn tất`,'orders:sell','📦');
-  if(st==='cancelled'){if(who==='b')notify(o.s,`${nm(o.b)} đã hủy đơn #${o.code} (${tt})`,'orders:sell','❌');else notify(o.b,`Người bán đã từ chối đơn #${o.code} (${tt})`,'orders:buy','❌')}}
- toast(msg);refresh(true)}
+ const action={cancelled:'cancel',confirmed:'confirm',shipping:'ship',done:'complete'}[st];
+ if(!action)return toast('Trạng thái đơn không hợp lệ.');
+ try{
+  await api('/orders/'+id+'/'+action,{method:'POST'});
+  await loadFromApi();
+  toast(msg);
+  refresh(true);
+  return true;
+ }catch(err){toast(err.message);return false}
+}
 function reviewForm(oid){openDlg(`${dh('Đánh giá người bán')}<div class="db"><div class="two"><label class="f">Số sao<select id="ors"><option value="5">5 ★ Rất tốt</option><option value="4">4 ★ Tốt</option><option value="3">3 ★ Bình thường</option><option value="2">2 ★ Chưa tốt</option><option value="1">1 ★ Tệ</option></select></label><label class="f">Nhận xét<input id="orx" maxlength="200" placeholder="Giao hàng đúng hẹn, đồ đẹp..."></label></div><button class="btn" onclick="submitReview(${oid})">Gửi đánh giá</button></div>`)}
 function submitReview(oid){const o=ORD.find(x=>x.id===oid);if(!o||o.b!==me()||o.st!=='done'||o.rv)return toast('Không thể đánh giá đơn này.');
  R.push({l:o.l,to:o.s,f:me(),star:+$('#ors').value,x:$('#orx').value.trim()||'Không có nhận xét'});o.rv=true;notify(o.s,`${nm(me())} đã đánh giá bạn ${R[R.length-1].star} sao cho đơn #${o.code}`,'orders:sell','⭐');$('#dlg').close();toast('Cảm ơn bạn đã đánh giá người bán.');refresh(true)}
@@ -168,7 +169,7 @@ function openBuyForm(id){
  </div>`);
 }
 
-function submitBuy(id){
+async function submitBuy(id){
  const bad=(fid,msg)=>{const f=$('#'+fid);f.classList.add('bad');f.querySelector('.err').textContent=msg;return 1};
  ['bf_name','bf_phone','bf_addr'].forEach(i=>{$('#'+i).classList.remove('bad');$('#'+i).querySelector('.err').textContent=''});
  const name=$('#bname').value.trim(),phone=$('#bphone').value.trim(),addr=$('#baddr').value.trim(),pay=$('#bpay').value,note=$('#bnote').value.trim();
@@ -177,17 +178,20 @@ function submitBuy(id){
  if(!/^0\d{8,10}$/.test(phone.replace(/\s+/g,'')))e+=bad('bf_phone','Số điện thoại chưa đúng định dạng (10-11 số).');
  if(addr.length<5)e+=bad('bf_addr','Vui lòng nhập rõ địa chỉ hoặc điểm hẹn giao hàng.');
  if(e)return;
- const l=L.find(x=>x.id===id),m=me();
- if(l.st!=='approved'||l.s===m)return toast('Tin này không còn có thể đặt mua.');
- const now=Date.now(),o={id:ORD.length+1,code:newCode(),l:id,b:m,s:l.s,p:l.p,name,phone,addr,pay,note,st:'pending',ts:{pending:now},eta:etaFor(pay,now)};
- ORD.push(o);l.st='sold';
- notify(l.s,`${nm(m)} vừa đặt mua "${l.t}" (${vnd(l.p)}). Đơn #${o.code} đang chờ bạn xác nhận`,'orders:sell','🛒');
- notify(m,`Bạn đã đặt hàng #${o.code} (${l.t}). Chờ người bán xác nhận`,'orders:buy','🧾');
- openDlg(`${dh('Đặt hàng thành công')}<div class="db" style="text-align:center"><div style="font-size:56px">🎉</div><h3 style="margin:0">Cảm ơn bạn đã đặt hàng!</h3>
-  <div class="mut">Mã đơn <b>#${o.code}</b> · ${esc(l.t)} · ${vnd(l.p)}</div>
-  <div class="box" style="text-align:left"><div>🚚 Dự kiến giao: <b>${fd(o.eta)}</b></div><div class="mut">Người bán sẽ xác nhận và liên hệ qua số ${esc(phone)}. Bạn theo dõi tiến trình ở mục <b>Đơn hàng</b>.</div></div>
-  <div class="row"><button class="btn o" style="flex:1" onclick="$('#dlg').close()">Tiếp tục mua sắm</button><button class="btn" style="flex:1" onclick="openOrders('buy')">Xem đơn hàng</button></div></div>`);
- refresh(true);
+ const l=L.find(x=>x.id===id);
+ if(!l||l.st!=='approved'||l.s===me())return toast('Tin này không còn có thể đặt mua.');
+ try{
+  const order=await api('/listings/'+id+'/orders',{method:'POST',body:JSON.stringify({
+   delivery_name:name,delivery_phone:phone,delivery_address:addr,payment_method:pay,note:note||null
+  })});
+  await loadFromApi();
+  $('#dlg').close();
+  openDlg(`${dh('Đặt hàng thành công')}<div class="db" style="text-align:center"><div style="font-size:56px">🎉</div><h3 style="margin:0">Đơn hàng đã được gửi đến người bán</h3>
+   <div class="mut">Mã đơn <b>#DH${String(order.id).padStart(6,'0')}</b> · ${esc(l.t)} · ${vnd(order.amount)}</div>
+   <div class="box" style="text-align:left"><div>📍 ${esc(addr)}</div><div>📞 ${esc(phone)}</div><div class="mut">Người bán cần xác nhận trước khi giao hàng. Theo dõi tại mục <b>Đơn hàng</b>.</div></div>
+   <div class="row"><button class="btn o" style="flex:1" onclick="$('#dlg').close()">Tiếp tục mua sắm</button><button class="btn" style="flex:1" onclick="openOrders('buy')">Xem đơn hàng</button></div></div>`);
+  refresh(true);
+ }catch(err){toast(err.message);}
 }
 
 async function offer(id){
@@ -321,9 +325,8 @@ function bellHtml(){const mine=NOTI.filter(x=>x.to===me()).sort((a,b)=>b.ts-a.ts
  <div class="blm" id="blm" hidden><div class="blh"><b>Thông báo</b><button onclick="readAll()">Đánh dấu đã đọc</button></div><div class="bll">${mine.length?mine.map(x=>`<button class="bli ${x.read?'':'un'}" onclick="openNoti(${x.id})"><span class="bie">${x.ic}</span><span><b>${esc(x.t)}</b><small>${timeAgo(x.ts)}</small></span></button>`).join(''):'<div class="bln">Chưa có thông báo nào.</div>'}</div></div></div>`}
 function toggleBell(){const m=$('#blm'),open=m.hidden;closeUM();m.hidden=!open;$('#blb').setAttribute('aria-expanded',open)}
 function closeBell(){const m=$('#blm');if(m){m.hidden=true;$('#blb').setAttribute('aria-expanded','false')}}
-function readAll(){NOTI.forEach(x=>{if(x.to===me())x.read=true});save();side()}
-function openNoti(id){const n=NOTI.find(x=>x.id===id);if(!n||n.to!==me())return;n.read=true;save();closeBell();
- const [v,t]=n.link.split(':');if(v==='orders'){S.ot=t||'buy';S.og='all'}go(['home','saved','mine','orders'].includes(v)?v:'home');side()}
+async function readAll(){try{await api('/notifications/read-all',{method:'POST'});await loadFromApi();side()}catch(e){toast(e.message)}}
+async function openNoti(id){const n=NOTI.find(x=>x.id===id);if(!n||n.to!==me())return;try{await api('/notifications/'+id+'/read',{method:'PATCH'});await loadFromApi()}catch(e){toast(e.message)}closeBell();const [v,t]=n.link.split(':');if(v==='orders'){S.ot=t||'buy';S.og='all'}go(['home','saved','mine','orders'].includes(v)?v:'home');side()}
 document.addEventListener('click',e=>{if(!e.target.closest('.bl'))closeBell()});
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeBell()});
 addEventListener('storage',e=>{if(e.key===KEY&&CUR)side()});
