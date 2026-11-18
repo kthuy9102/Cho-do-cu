@@ -285,21 +285,7 @@ function dash() {
             `
                 ${stB(l)}
 
-                ${l.st === 'approved'
-                    ? `<button class="btn sm r"
-                        onclick="setSt(${l.id},'hidden')">
-                        Ẩn
-                       </button>`
-                    : ''
-                }
-
-                ${l.st === 'hidden'
-                    ? `<button class="btn sm o"
-                        onclick="setSt(${l.id},'approved')">
-                        Khôi phục
-                       </button>`
-                    : ''
-                }
+                <!-- Backend hiện chưa có thao tác ẩn/khôi phục trực tiếp từ tab tất cả. -->
             `
         )).join('');
     }
@@ -639,7 +625,7 @@ render();
 
 
 /* ===== ADMIN DÙNG DỮ LIỆU TỪ BACKEND ===== */
-let admCats = [], admState = 0;   // admState: 0 chưa tải, 1 đang tải, 2 xong
+let admCats = [], admState = 0, admError = '';   // 0 chưa tải, 1 đang tải, 2 xong, 3 lỗi
 const isAdm = () => sessionStorage.getItem(AKEY) === '1' && !!sessionStorage.getItem(AUTH_TOKEN_KEY);
 
 adminLogin = () => false;          // bỏ tài khoản cứng: bắt buộc đăng nhập qua backend
@@ -677,6 +663,7 @@ function admMap(x) {
 }
 
 async function admLoad() {
+  admError = '';
   try {
     const rc = await admFetch('/categories');
     const cats = Array.isArray(rc) ? rc : rc.items;
@@ -690,15 +677,24 @@ async function admLoad() {
         if (x.seller) U[x.seller.id] = { n: x.seller.full_name, h: '' };
       });
     }
-    L = all;
     const reports = await admFetch('/moderation/reports?status=open&page_size=100');
-    RP = (reports.items || []).map(x => {
+    const mappedReports = (reports.items || []).map(x => {
       if (x.reporter) U[x.reporter.id] = { n: x.reporter.full_name, h: '' };
       if (x.listing && x.listing.seller) U[x.listing.seller.id] = { n: x.listing.seller.full_name, h: '' };
       return { id: x.id, l: x.listing.id, f: x.reporter.id, x: x.detail || x.reason_code, open: x.status === 'open' };
     });
-  } catch (e) { toast(e.message); }
-  admState = 2; render();
+    // Chỉ thay dữ liệu sau khi tất cả request thành công.
+    L = all;
+    RP = mappedReports;
+    admState = 2;
+  } catch (e) {
+    // Không để dữ liệu mẫu/local còn trong bộ nhớ bị hiển thị như dữ liệu máy chủ.
+    L = [];
+    RP = [];
+    admError = e.message || 'Không tải được dữ liệu quản trị từ máy chủ.';
+    admState = 3;
+  }
+  render();
 }
 
 render = function () {
@@ -708,7 +704,11 @@ render = function () {
     : '';
   if (!on) { admState = 0; $('#app').innerHTML = loginHtml(); return; }
   if (admState === 0) { admState = 1; admLoad(); }
-  $('#app').innerHTML = admState === 2 ? dash() : '<div class="card empty">Đang tải dữ liệu từ máy chủ...</div>';
+  $('#app').innerHTML = admState === 2
+    ? dash()
+    : admState === 3
+      ? `<div class="card empty"><p>Không thể tải dữ liệu quản trị: ${esc(admError)}</p><button class="btn" onclick="admState=0;render()">Thử tải lại</button></div>`
+      : '<div class="card empty">Đang tải dữ liệu từ máy chủ...</div>';
 };
 
 async function admAct(path, body, okMsg) {
