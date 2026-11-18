@@ -31,13 +31,13 @@ docker compose up -d --build
 docker compose ps
 ```
 
-Chờ service `db` healthy và backend chạy xong. Sau đó tạo bảng và dữ liệu demo lần đầu:
+Chờ service `db` healthy và backend chạy xong. Backend tự chạy `alembic upgrade head` trước khi Uvicorn khởi động. Sau khi các service healthy, nạp dữ liệu demo lần đầu:
 
 ```powershell
-docker compose exec backend python -m scripts.seed --create-tables
+docker compose exec backend python -m scripts.seed
 ```
 
-Lệnh seed chỉ tạo dữ liệu demo nếu database chưa có user. Không chạy `--create-tables` như cơ chế migration lâu dài; giai đoạn SQL tiếp theo sẽ bổ sung Alembic.
+Lệnh seed chỉ nạp dữ liệu khi database chưa có người dùng; chạy lại trên database đã có dữ liệu sẽ tự bỏ qua. Không dùng `--create-tables` trong quy trình Docker/triển khai: Alembic là nguồn quản lý schema.
 
 ## 3. Kiểm tra
 

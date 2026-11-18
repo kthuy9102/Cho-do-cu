@@ -52,6 +52,14 @@ class OfferStatus(str, enum.Enum):
     cancelled = "cancelled"
 
 
+class OrderStatus(str, enum.Enum):
+    pending = "pending"      # chờ người bán xác nhận
+    confirmed = "confirmed"  # người bán đã xác nhận
+    shipped = "shipped"      # người bán đã gửi/giao hàng
+    completed = "completed"  # người mua xác nhận hoàn tất
+    cancelled = "cancelled"  # hủy trước khi giao
+
+
 class ReportReason(str, enum.Enum):
     spam = "spam"
     fraud = "fraud"
@@ -223,3 +231,54 @@ class Favorite(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     listing: Mapped[Listing] = relationship(back_populates="favorites")
+
+
+
+class Order(Base):
+    """Đơn hàng được tạo nguyên tử khi người bán chấp nhận một offer."""
+
+    __tablename__ = "orders"
+    __table_args__ = (
+        CheckConstraint("amount > 0", name="ck_orders_amount_positive"),
+        Index("ix_orders_buyer_created", "buyer_id", "created_at"),
+        Index("ix_orders_seller_created", "seller_id", "created_at"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    offer_id: Mapped[int | None] = mapped_column(ForeignKey("offers.id"), unique=True, index=True, nullable=True)
+    listing_id: Mapped[int] = mapped_column(ForeignKey("listings.id"), index=True)
+    buyer_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    seller_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    amount: Mapped[int] = mapped_column(BigInteger)
+    delivery_name: Mapped[str | None] = mapped_column(String(100))
+    delivery_phone: Mapped[str | None] = mapped_column(String(20))
+    delivery_address: Mapped[str | None] = mapped_column(String(500))
+    payment_method: Mapped[str | None] = mapped_column(String(60))
+    note: Mapped[str | None] = mapped_column(String(500))
+    status: Mapped[OrderStatus] = mapped_column(_enum(OrderStatus), default=OrderStatus.pending, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    listing: Mapped[Listing] = relationship()
+    buyer: Mapped[User] = relationship(foreign_keys=[buyer_id])
+    seller: Mapped[User] = relationship(foreign_keys=[seller_id])
+
+
+class Notification(Base):
+    """Thông báo lưu bền vững theo từng người nhận."""
+
+    __tablename__ = "notifications"
+    __table_args__ = (Index("ix_notifications_recipient_created", "recipient_id", "created_at"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    recipient_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    actor_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    event_type: Mapped[str] = mapped_column(String(40))
+    title: Mapped[str] = mapped_column(String(160))
+    body: Mapped[str] = mapped_column(String(500))
+    resource_type: Mapped[str | None] = mapped_column(String(40))
+    resource_id: Mapped[int | None] = mapped_column(Integer)
+    read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    actor: Mapped[Optional[User]] = relationship(foreign_keys=[actor_id])

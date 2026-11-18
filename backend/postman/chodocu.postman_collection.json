@@ -23,6 +23,22 @@
     {
       "key": "run_id",
       "value": ""
+    },
+    {
+      "key": "order_listing_id",
+      "value": ""
+    },
+    {
+      "key": "order_id",
+      "value": ""
+    },
+    {
+      "key": "order_offer_id",
+      "value": ""
+    },
+    {
+      "key": "notification_id",
+      "value": ""
     }
   ],
   "item": [
@@ -2837,6 +2853,329 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test(\"401 rồi 429 khi bị giới hạn\", function () { pm.expect([401, 429]).to.include(pm.response.code); if (pm.response.code === 429) { pm.expect(pm.response.headers.get(\"Retry-After\")).to.be.ok; } });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "08 Đơn hàng và thông báo",
+      "description": "Luồng đặt mua trực tiếp, người bán xác nhận/giao hàng, người mua hoàn tất; kiểm tra hộp thông báo và quyền riêng tư.",
+      "item": [
+        {
+          "name": "Người bán đăng tin thử nghiệm đơn hàng → 201",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{seller_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Tin Postman Orders {{run_id}}\",\n  \"description\": \"Tin dùng riêng để kiểm thử quy trình đặt hàng và thông báo trên môi trường thử nghiệm.\",\n  \"price\": 125000,\n  \"condition\": \"good\",\n  \"category_id\": \"{{category_id}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{api}}/listings"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Tạo tin thành công',()=>pm.response.to.have.status(201));",
+                  "if(pm.response.code===201) pm.collectionVariables.set('order_listing_id',pm.response.json().id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Moderator duyệt tin thử nghiệm → 200",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{mod_token}}"
+              }
+            ],
+            "url": "{{api}}/moderation/listings/{{order_listing_id}}/approve"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Duyệt tin thành công',()=>pm.response.to.have.status(200));",
+                  "pm.test('Tin đã approved',()=>pm.expect(pm.response.json().status).to.eql('approved'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Người mua đặt hàng trực tiếp → 201",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{buyer_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"delivery_name\": \"Postman Buyer\",\n  \"delivery_phone\": \"0912345678\",\n  \"delivery_address\": \"Diem hen thu nghiem\",\n  \"payment_method\": \"Gặp trực tiếp\",\n  \"note\": \"Đơn hàng Postman test\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{api}}/listings/{{order_listing_id}}/orders"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Đặt hàng thành công',()=>pm.response.to.have.status(201));",
+                  "if(pm.response.code===201){const x=pm.response.json();pm.collectionVariables.set('order_id',x.id);pm.collectionVariables.set('order_offer_id',x.offer_id);pm.test('Đơn chờ người bán xác nhận',()=>pm.expect(x.status).to.eql('pending'));}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Người bán xem đơn bán → 200",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{seller_token}}"
+              }
+            ],
+            "url": "{{api}}/orders?side=selling&page_size=100"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Danh sách đơn bán OK',()=>pm.response.to.have.status(200));",
+                  "pm.test('Có đơn vừa đặt',()=>pm.expect(pm.response.json().items.some(x=>x.id===Number(pm.collectionVariables.get('order_id')))).to.eql(true));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Người mua xem đơn mua → 200",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{buyer_token}}"
+              }
+            ],
+            "url": "{{api}}/orders?side=buying&page_size=100"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Danh sách đơn mua OK',()=>pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Người bán xác nhận đơn → confirmed",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{seller_token}}"
+              }
+            ],
+            "url": "{{api}}/orders/{{order_id}}/confirm"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Xác nhận đơn OK',()=>pm.response.to.have.status(200));",
+                  "pm.test('Trạng thái confirmed',()=>pm.expect(pm.response.json().status).to.eql('confirmed'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Người bán cập nhật đang giao → shipped",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{seller_token}}"
+              }
+            ],
+            "url": "{{api}}/orders/{{order_id}}/ship"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Cập nhật giao hàng OK',()=>pm.response.to.have.status(200));",
+                  "pm.test('Trạng thái shipped',()=>pm.expect(pm.response.json().status).to.eql('shipped'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Người mua xác nhận nhận hàng → completed",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{buyer_token}}"
+              }
+            ],
+            "url": "{{api}}/orders/{{order_id}}/complete"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Hoàn tất đơn OK',()=>pm.response.to.have.status(200));",
+                  "pm.test('Trạng thái completed',()=>pm.expect(pm.response.json().status).to.eql('completed'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Người mua xem hộp thông báo → 200",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{buyer_token}}"
+              }
+            ],
+            "url": "{{api}}/notifications?page_size=100"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Hộp thông báo OK',()=>pm.response.to.have.status(200));",
+                  "const a=pm.response.json().items||[];if(a.length)pm.collectionVariables.set('notification_id',a[0].id);",
+                  "pm.test('Có thông báo phát sinh từ giao dịch',()=>pm.expect(a.length).to.be.above(0));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Người mua xem số thông báo chưa đọc → 200",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{buyer_token}}"
+              }
+            ],
+            "url": "{{api}}/notifications/unread-count"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Unread count OK',()=>pm.response.to.have.status(200));",
+                  "pm.test('Số chưa đọc là số nguyên',()=>pm.expect(pm.response.json().unread_count).to.be.a('number'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Đánh dấu một thông báo đã đọc → 200",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{buyer_token}}"
+              }
+            ],
+            "url": "{{api}}/notifications/{{notification_id}}/read"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Đánh dấu đã đọc OK',()=>pm.response.to.have.status(200));",
+                  "pm.test('read_at được ghi',()=>pm.expect(pm.response.json().read_at).not.to.be.null);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Đánh dấu toàn bộ thông báo đã đọc → 204",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{buyer_token}}"
+              }
+            ],
+            "url": "{{api}}/notifications/read-all"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Đánh dấu tất cả đã đọc OK',()=>pm.response.to.have.status(204));"
                 ]
               }
             }

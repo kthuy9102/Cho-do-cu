@@ -1,5 +1,6 @@
-/* Dữ liệu mẫu dùng chung cho trang chợ (index.html) và trang quản trị (admin.html), lưu trong localStorage.
-   Khi có API FastAPI: thay L, O, R, RP bằng fetch('/api/...'). */
+/* Dữ liệu khởi tạo giao diện (fallback) cho trang chợ và quản trị.
+   Dữ liệu nghiệp vụ thực tế được api.js đồng bộ từ Backend; localStorage chỉ còn phục vụ
+   trạng thái giao diện/tương thích dữ liệu cũ, không phải nguồn dữ liệu chính. */
 const $=s=>document.querySelector(s);
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const nz=s=>s.normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/đ/g,'d').toLowerCase();

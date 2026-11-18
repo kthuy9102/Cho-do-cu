@@ -6,7 +6,8 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.exceptions import ConflictError, ForbiddenError, NotFoundError
-from app.models import Listing, ListingStatus, Offer, OfferStatus, User
+from app.models import Listing, ListingStatus, Offer, OfferStatus, Order, OrderStatus, User
+from app.services.notifications import notify
 from app.schemas.offer import OfferCreate
 from app.services.listings import PUBLIC_STATUSES
 
@@ -34,6 +35,9 @@ def create_offer(db: Session, listing_id: int, buyer: User, payload: OfferCreate
 
     offer = Offer(listing_id=listing_id, buyer_id=buyer.id, amount=payload.amount, message=payload.message)
     db.add(offer)
+    notify(db, listing.seller_id, "offer_received", "Bạn có đề nghị mua mới",
+           f"Có người gửi đề nghị {payload.amount:,} VND cho tin '{listing.title}'.",
+           actor_id=buyer.id, resource_type="listing", resource_id=listing.id)
     try:
         db.commit()
     except IntegrityError:
@@ -81,8 +85,24 @@ def accept_offer(db: Session, offer_id: int, seller: User) -> Offer:
         db.rollback()
         raise ConflictError("Tin đăng không còn ở trạng thái đang bán", code="listing_not_available")
 
+    if db.scalar(select(Order.id).where(Order.offer_id == offer.id)):
+        db.rollback()
+        raise ConflictError("Đề nghị này đã được gửi thành đơn hàng; hãy xử lý trong mục Đơn hàng", code="offer_has_order")
+    active_order = db.scalar(select(Order.id).where(
+        Order.listing_id == listing.id, Order.status.in_([OrderStatus.pending, OrderStatus.confirmed, OrderStatus.shipped])
+    ).limit(1))
+    if active_order:
+        db.rollback()
+        raise ConflictError("Tin đang có đơn hàng khác chờ xử lý", code="listing_has_active_order")
+
     offer.status = OfferStatus.accepted
     listing.status = ListingStatus.sold
+    order = Order(offer_id=offer.id, listing_id=listing.id, buyer_id=offer.buyer_id,
+                  seller_id=seller.id, amount=offer.amount, status=OrderStatus.confirmed)
+    db.add(order)
+    notify(db, offer.buyer_id, "offer_accepted", "Đề nghị mua đã được chấp nhận",
+           f"Người bán đã chấp nhận đề nghị cho tin '{listing.title}'. Đơn hàng đang chờ giao.",
+           actor_id=seller.id, resource_type="listing", resource_id=listing.id)
     db.execute(  # các đề nghị chờ khác của cùng tin tự động bị từ chối
         update(Offer)
         .where(Offer.listing_id == listing.id, Offer.id != offer.id, Offer.status == OfferStatus.pending)
@@ -100,6 +120,9 @@ def reject_offer(db: Session, offer_id: int, seller: User) -> Offer:
     if offer.status != OfferStatus.pending:
         raise ConflictError("Đề nghị này không còn ở trạng thái chờ", code="offer_not_pending")
     offer.status = OfferStatus.rejected
+    notify(db, offer.buyer_id, "offer_rejected", "Đề nghị mua bị từ chối",
+           f"Người bán đã từ chối đề nghị cho tin '{offer.listing.title}'.",
+           actor_id=seller.id, resource_type="listing", resource_id=offer.listing_id)
     db.commit()
     logger.info("offer_rejected", extra={"offer_id": offer.id, "seller_id": seller.id})
     return offer
@@ -112,6 +135,9 @@ def cancel_offer(db: Session, offer_id: int, buyer: User) -> Offer:
     if offer.status != OfferStatus.pending:
         raise ConflictError("Chỉ hủy được đề nghị đang chờ", code="offer_not_pending")
     offer.status = OfferStatus.cancelled
+    notify(db, offer.listing.seller_id, "offer_cancelled", "Đề nghị mua đã bị hủy",
+           f"Người mua đã hủy đề nghị cho tin '{offer.listing.title}'.",
+           actor_id=buyer.id, resource_type="listing", resource_id=offer.listing_id)
     db.commit()
     logger.info("offer_cancelled", extra={"offer_id": offer.id, "buyer_id": buyer.id})
     return offer

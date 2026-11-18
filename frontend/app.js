@@ -42,8 +42,16 @@ function renderRes(){const box=$('#res');
 function pg(i){S.page=i;renderRes();window.scrollTo({top:$('#res').offsetTop-80})}
 function setSort(v){S.sort=v;S.page=1;$('#fs').value=v;renderRes()}
 function search(){S.q=$('#q').value.trim();S.cat=+$('#fc').value;S.min=$('#fmin').value;S.max=$('#fmax').value;S.sort=$('#fs').value;S.page=1;if(S.view!=='home')go('home');else{renderRes();side()}}
-function fav(id,e){e.stopPropagation();if(!CUR)return needLogin();S.fav.has(id)?S.fav.delete(id):S.fav.add(id);renderRes();side()}
-
+async function fav(id,e){
+ if(e)e.stopPropagation();
+ if(!CUR)return needLogin();
+ const was=S.fav.has(id);
+ try {
+  await api("/listings/"+id+"/favorite",{method:was?"DELETE":"PUT"});
+  if(was)S.fav.delete(id);else S.fav.add(id);
+  renderRes();side();
+ } catch(err){toast(err.message);}
+}
 function row(l,right,sub){return `<div class="ls"><div class="gr" onclick="openDetail(${l.id})">${''}<b>${esc(l.t)}</b><span class="mut">${vnd(l.p)} · ${esc(nm(l.s))} · ${ago(l.a)}${sub||''}</span></div>${right}</div>`.replace('<div class="gr"',`<div class="gr"`)}
 const stB=l=>({pending:'<span class="badge w">Chờ duyệt</span>',approved:'<span class="badge">Đang bán</span>',sold:'<span class="badge">Đã bán</span>',hidden:'<span class="badge x">Bị ẩn</span>'}[l.st]);
 function mineHtml(){
@@ -114,22 +122,23 @@ function askDlg(title,msg,yes,fn){window._ask=fn;openDlg(`${dh(title)}<div class
 function askCancel(id){askDlg('Hủy đơn hàng?','Bạn chắc chắn muốn hủy đơn này? Sản phẩm sẽ được mở bán lại.','Hủy đơn',()=>setOrd(id,'cancelled','Đã hủy đơn hàng.','b'))}
 function askRefuse(id){askDlg('Từ chối đơn hàng?','Người mua sẽ được báo là đơn đã bị hủy và sản phẩm được mở bán lại.','Từ chối',()=>setOrd(id,'cancelled','Đã từ chối đơn hàng.','s'))}
 function sellerStep(id,st){setOrd(id,st,st==='confirmed'?'Đã xác nhận đơn. Hãy chuẩn bị hàng.':'Đã chuyển sang đang giao hàng.','s')}
-function receiveOrder(id){setOrd(id,'done','Cảm ơn bạn! Đơn hàng đã hoàn tất.','b');reviewForm(id)}
-function setOrd(id,st,msg,who){const o=ORD.find(x=>x.id===id),now=Date.now();
+async function receiveOrder(id){const ok=await setOrd(id,'done','Cảm ơn bạn! Đơn hàng đã hoàn tất.','b');if(ok)reviewForm(id)}
+async function setOrd(id,st,msg,who){
+ const o=ORD.find(x=>x.id===id);
  if(!CUR||!o||(who==='b'?o.b:o.s)!==me())return toast('Bạn không có quyền thao tác đơn này (403).');
- const ok={cancelled:who==='b'?o.st==='pending':o.st==='pending',confirmed:o.st==='pending',shipping:o.st==='confirmed',done:o.st==='shipping'}[st];
- if(!ok)return toast('Đơn hàng không còn ở trạng thái phù hợp để thao tác.');
- o.st=st;o.ts[st]=now;if(st==='cancelled')o.by=who==='b'?'buyer':'seller';if(st==='confirmed')o.eta=etaFor(o.pay,now);
- if(st==='cancelled'){const l=L.find(x=>x.id===o.l);if(l&&l.st==='sold'&&!ORD.some(x=>x.l===o.l&&x.id!==o.id&&x.st!=='cancelled'))l.st='approved'}
- {const ll=L.find(x=>x.id===o.l),tt=ll?ll.t:'sản phẩm';
-  if(st==='confirmed')notify(o.b,`Đơn #${o.code} (${tt}) đã được xác nhận. Dự kiến giao ${fd(o.eta)}`,'orders:buy','✅');
-  if(st==='shipping')notify(o.b,`Đơn #${o.code} (${tt}) đang được giao đến bạn`,'orders:buy','🚚');
-  if(st==='done')notify(o.s,`${nm(o.b)} đã nhận hàng. Đơn #${o.code} hoàn tất`,'orders:sell','📦');
-  if(st==='cancelled'){if(who==='b')notify(o.s,`${nm(o.b)} đã hủy đơn #${o.code} (${tt})`,'orders:sell','❌');else notify(o.b,`Người bán đã từ chối đơn #${o.code} (${tt})`,'orders:buy','❌')}}
- toast(msg);refresh(true)}
+ const action={cancelled:'cancel',confirmed:'confirm',shipping:'ship',done:'complete'}[st];
+ if(!action)return toast('Trạng thái đơn không hợp lệ.');
+ try{
+  await api('/orders/'+id+'/'+action,{method:'POST'});
+  await loadFromApi();
+  toast(msg);
+  refresh(true);
+  return true;
+ }catch(err){toast(err.message);return false}
+}
 function reviewForm(oid){openDlg(`${dh('Đánh giá người bán')}<div class="db"><div class="two"><label class="f">Số sao<select id="ors"><option value="5">5 ★ Rất tốt</option><option value="4">4 ★ Tốt</option><option value="3">3 ★ Bình thường</option><option value="2">2 ★ Chưa tốt</option><option value="1">1 ★ Tệ</option></select></label><label class="f">Nhận xét<input id="orx" maxlength="200" placeholder="Giao hàng đúng hẹn, đồ đẹp..."></label></div><button class="btn" onclick="submitReview(${oid})">Gửi đánh giá</button></div>`)}
-function submitReview(oid){const o=ORD.find(x=>x.id===oid);if(!o||o.b!==me()||o.st!=='done'||o.rv)return toast('Không thể đánh giá đơn này.');
- R.push({l:o.l,to:o.s,f:me(),star:+$('#ors').value,x:$('#orx').value.trim()||'Không có nhận xét'});o.rv=true;notify(o.s,`${nm(me())} đã đánh giá bạn ${R[R.length-1].star} sao cho đơn #${o.code}`,'orders:sell','⭐');$('#dlg').close();toast('Cảm ơn bạn đã đánh giá người bán.');refresh(true)}
+async function submitReview(oid){const o=ORD.find(x=>x.id===oid);if(!o||o.b!==me()||o.st!=='done'||o.rv||!o.offer_id)return toast('Không thể đánh giá đơn này.');
+ try{await api('/offers/'+o.offer_id+'/review',{method:'POST',body:JSON.stringify({rating:+$('#ors').value,comment:$('#orx').value.trim()||null})});await loadFromApi();$('#dlg').close();toast('Cảm ơn bạn đã đánh giá người bán.');refresh(true)}catch(e){toast(e.message)}}
 
 // FORM ĐIỀN THÔNG TIN ĐẶT MUA & GIAO HÀNG
 function openBuyForm(id){
@@ -160,7 +169,7 @@ function openBuyForm(id){
  </div>`);
 }
 
-function submitBuy(id){
+async function submitBuy(id){
  const bad=(fid,msg)=>{const f=$('#'+fid);f.classList.add('bad');f.querySelector('.err').textContent=msg;return 1};
  ['bf_name','bf_phone','bf_addr'].forEach(i=>{$('#'+i).classList.remove('bad');$('#'+i).querySelector('.err').textContent=''});
  const name=$('#bname').value.trim(),phone=$('#bphone').value.trim(),addr=$('#baddr').value.trim(),pay=$('#bpay').value,note=$('#bnote').value.trim();
@@ -169,35 +178,54 @@ function submitBuy(id){
  if(!/^0\d{8,10}$/.test(phone.replace(/\s+/g,'')))e+=bad('bf_phone','Số điện thoại chưa đúng định dạng (10-11 số).');
  if(addr.length<5)e+=bad('bf_addr','Vui lòng nhập rõ địa chỉ hoặc điểm hẹn giao hàng.');
  if(e)return;
- const l=L.find(x=>x.id===id),m=me();
- if(l.st!=='approved'||l.s===m)return toast('Tin này không còn có thể đặt mua.');
- const now=Date.now(),o={id:ORD.length+1,code:newCode(),l:id,b:m,s:l.s,p:l.p,name,phone,addr,pay,note,st:'pending',ts:{pending:now},eta:etaFor(pay,now)};
- ORD.push(o);l.st='sold';
- notify(l.s,`${nm(m)} vừa đặt mua "${l.t}" (${vnd(l.p)}). Đơn #${o.code} đang chờ bạn xác nhận`,'orders:sell','🛒');
- notify(m,`Bạn đã đặt hàng #${o.code} (${l.t}). Chờ người bán xác nhận`,'orders:buy','🧾');
- openDlg(`${dh('Đặt hàng thành công')}<div class="db" style="text-align:center"><div style="font-size:56px">🎉</div><h3 style="margin:0">Cảm ơn bạn đã đặt hàng!</h3>
-  <div class="mut">Mã đơn <b>#${o.code}</b> · ${esc(l.t)} · ${vnd(l.p)}</div>
-  <div class="box" style="text-align:left"><div>🚚 Dự kiến giao: <b>${fd(o.eta)}</b></div><div class="mut">Người bán sẽ xác nhận và liên hệ qua số ${esc(phone)}. Bạn theo dõi tiến trình ở mục <b>Đơn hàng</b>.</div></div>
-  <div class="row"><button class="btn o" style="flex:1" onclick="$('#dlg').close()">Tiếp tục mua sắm</button><button class="btn" style="flex:1" onclick="openOrders('buy')">Xem đơn hàng</button></div></div>`);
- refresh(true);
+ const l=L.find(x=>x.id===id);
+ if(!l||l.st!=='approved'||l.s===me())return toast('Tin này không còn có thể đặt mua.');
+ try{
+  const order=await api('/listings/'+id+'/orders',{method:'POST',body:JSON.stringify({
+   delivery_name:name,delivery_phone:phone,delivery_address:addr,payment_method:pay,note:note||null
+  })});
+  await loadFromApi();
+  $('#dlg').close();
+  openDlg(`${dh('Đặt hàng thành công')}<div class="db" style="text-align:center"><div style="font-size:56px">🎉</div><h3 style="margin:0">Đơn hàng đã được gửi đến người bán</h3>
+   <div class="mut">Mã đơn <b>#DH${String(order.id).padStart(6,'0')}</b> · ${esc(l.t)} · ${vnd(order.amount)}</div>
+   <div class="box" style="text-align:left"><div>📍 ${esc(addr)}</div><div>📞 ${esc(phone)}</div><div class="mut">Người bán cần xác nhận trước khi giao hàng. Theo dõi tại mục <b>Đơn hàng</b>.</div></div>
+   <div class="row"><button class="btn o" style="flex:1" onclick="$('#dlg').close()">Tiếp tục mua sắm</button><button class="btn" style="flex:1" onclick="openOrders('buy')">Xem đơn hàng</button></div></div>`);
+  refresh(true);
+ }catch(err){toast(err.message);}
 }
 
-function offer(id){const p=+$('#op').value,f=$('#fp');if(!Number.isInteger(p)||p<1000){f.classList.add('bad');$('#ep').textContent='Giá phải là số nguyên từ 1.000đ trở lên.';return}
- const m=me();if(O.some(o=>o.l===id&&o.f===m)){toast('Bạn đã gửi đề nghị cho tin này.');return}
- O.push({id:O.length+1,l:id,f:m,p,m:$('#om').value.trim(),st:'pending'});{const lo=L.find(x=>x.id===id);notify(lo.s,`${nm(m)} đề nghị ${vnd(p)} cho "${lo.t}"`,'mine','💬')}toast('Đã gửi đề nghị. Chờ người bán phản hồi.');openDetail(id);refresh(true)}
-function accept(oid){const o=O.find(x=>x.id===oid),l=L.find(x=>x.id===o.l);
- if(!CUR||l.s!==me())return toast('Bạn không có quyền xử lý đề nghị này (403).');
- if(l.st!=='approved')return toast('Tin này không còn ở trạng thái đang bán.');
- const now=Date.now(),bu=getUsers().find(u=>u.id===o.f)||{},pay='Gặp trực tiếp tại trường / Kiểm tra hàng rồi trả tiền';
- l.st='sold';O.forEach(x=>{if(x.l===o.l)x.st=x.id===oid?'accepted':'rejected'});
- ORD.push({id:ORD.length+1,code:newCode(),l:o.l,b:o.f,s:l.s,p:o.p,name:bu.name||nm(o.f),phone:bu.phone||'',addr:'Hẹn gặp trực tiếp với người bán',pay,note:o.m||'',st:'confirmed',ts:{pending:now,confirmed:now},eta:etaFor(pay,now)});
- notify(o.f,`${nm(l.s)} đã chấp nhận đề nghị ${vnd(o.p)} cho "${l.t}". Đơn hàng đã được tạo`,'orders:buy','✅');
- toast('Đã chấp nhận đề nghị. Đơn hàng đã được tạo, xem ở mục Đơn hàng.');openDetail(o.l);refresh(true)}
-function rejectO(oid){const o=O.find(x=>x.id===oid);o.st='rejected';notify(o.f,`Đề nghị ${vnd(o.p)} của bạn cho "${(L.find(x=>x.id===o.l)||{t:'sản phẩm'}).t}" bị từ chối`,'mine','❌');toast('Đã từ chối đề nghị.');openDetail(o.l);refresh(true)}
+async function offer(id){
+ const p=+$('#op').value,f=$('#fp');
+ if(!Number.isInteger(p)||p<1000){f.classList.add('bad');$('#ep').textContent='Giá phải là số nguyên từ 1.000đ trở lên.';return}
+ try {
+  const x=await api('/listings/'+id+'/offers',{method:'POST',body:JSON.stringify({amount:p,message:$('#om').value.trim()||null})});
+  O=O.filter(o=>!(o.l===id&&o.f===me()));O.push(mapOffer(x));
+  toast('Đã gửi đề nghị. Chờ người bán phản hồi.');openDetail(id);refresh(true);
+ } catch(err){toast(err.message);}
+}
+async function accept(oid){
+ const old=O.find(o=>o.id===oid);if(!old)return;
+ try {
+  const x=await api('/offers/'+oid+'/accept',{method:'POST'});
+  await loadFromApi();toast('Đã chấp nhận đề nghị.');openDetail(old.l);refresh(true);
+ } catch(err){toast(err.message);}
+}
+async function rejectO(oid){
+ const old=O.find(o=>o.id===oid);if(!old)return;
+ try {
+  await api('/offers/'+oid+'/reject',{method:'POST'});
+  await loadFromApi();toast('Đã từ chối đề nghị.');openDetail(old.l);refresh(true);
+ } catch(err){toast(err.message);}
+}
 function review(id){const l=L.find(x=>x.id===id);R.push({l:id,to:l.s,f:me(),star:+$('#rs').value,x:$('#rx').value.trim()||'Không có nhận xét'});toast('Cảm ơn bạn đã đánh giá người bán.');openDetail(id)}
 function repForm(id){openDlg(`${dh('Báo cáo tin vi phạm')}<div class="db"><label class="f">Lý do<select id="rr"><option>Lừa đảo hoặc nghi ngờ lừa đảo</option><option>Ảnh không đúng sản phẩm</option><option>Hàng cấm hoặc không phù hợp</option><option>Spam</option></select></label><button class="btn r" onclick="sendRep(${id})">Gửi báo cáo</button></div>`)}
-function sendRep(id){RP.push({id:RP.length+1,l:id,f:me(),x:$('#rr').value,open:true});$('#dlg').close();toast('Đã gửi báo cáo. Kiểm duyệt viên sẽ xem xét.');refresh(true)}
-
+async function sendRep(id){
+ const reasons={ 'Lừa đảo hoặc nghi ngờ lừa đảo':'fraud','Ảnh không đúng sản phẩm':'inappropriate','Hàng cấm hoặc không phù hợp':'prohibited_item','Spam':'spam' };
+ try {
+  await api('/listings/'+id+'/reports',{method:'POST',body:JSON.stringify({reason_code:reasons[$('#rr').value]||'other'})});
+  $('#dlg').close();toast('Đã gửi báo cáo. Kiểm duyệt viên sẽ xem xét.');
+ } catch(err){toast(err.message);}
+}
 let pics=[];
 function openPost(){if(!CUR)return needLogin();pics=[];
  openDlg(`${dh('Đăng tin bán')}<div class="db"><div class="mut">Hôm nay bạn đã đăng ${todayCount()}/${DAILY} tin. Tin cần kiểm duyệt viên duyệt trước khi hiển thị.</div>
@@ -247,7 +275,10 @@ function refresh(keep){save();const v=S.view;$('#cmp').style.display=$('#sc').st
 $('#chips').innerHTML=TAGS.map(t=>`<button class="chip" onclick="tag('${t[1]}')">#${t[0]}</button>`).join('');
 $('#fc').innerHTML='<option value="-1">Tất cả danh mục</option>'+CATS.map((c,i)=>`<option value="${i}">${c[0]}</option>`).join('');
 addEventListener('hashchange',route);
-loadFromApi().then(route).catch(e=>{console.error(e);toast('Không kết nối được máy chủ');route()});
+loadFromApi().then(route).catch(e=>{
+  console.error(e);
+  $('#res').innerHTML='<div class="card empty">Không tải được dữ liệu từ máy chủ. Vui lòng kiểm tra kết nối Backend rồi tải lại trang.</div>';
+});
 
 // ===== MENU NGƯỜI DÙNG (góc phải) =====
 function ico(n){return {
@@ -271,21 +302,21 @@ document.addEventListener('click',e=>{if(!e.target.closest('.um'))closeUM()});
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeUM()});
 function openProfile(){const m=me();
  openDlg(`${dh('Thông tin tài khoản')}<div class="db"><div class="sel"><div class="av lg" style="text-transform:uppercase">${esc(CUR.name[0])}</div><div><b>${esc(CUR.name)}</b><div class="mut">${repTxt(m)}</div></div></div>
- <div class="two"><label class="f" id="pf_name">Họ và tên<input id="pfn" maxlength="60" value="${esc(CUR.name)}"><span class="err"></span></label><label class="f" id="pf_phone">Số điện thoại<input id="pfp" type="tel" maxlength="15" value="${esc(CUR.phone||'')}"><span class="err"></span></label></div>
+ <label class="f" id="pf_name">Họ và tên<input id="pfn" maxlength="100" value="${esc(CUR.name)}"><span class="err"></span></label>
  <div class="two"><label class="f">Email<input value="${esc(CUR.email)}" disabled></label><label class="f">Mã sinh viên<input value="${esc(CUR.mssv||'Chưa cập nhật')}" disabled></label></div>
  <div class="mut">Tin đã đăng: <b>${L.filter(l=>l.s===m).length}</b> · Đơn mua: <b>${ORD.filter(o=>o.b===m).length}</b> · Đơn bán: <b>${ORD.filter(o=>o.s===m).length}</b></div>
  <button class="btn" onclick="saveProfile()">Lưu thay đổi</button></div>`)}
-function saveProfile(){
- const bad=(id,msg)=>{const f=$('#'+id);f.classList.add('bad');f.querySelector('.err').textContent=msg;return 1};
- ['pf_name','pf_phone'].forEach(i=>{$('#'+i).classList.remove('bad');$('#'+i).querySelector('.err').textContent=''});
- const name=$('#pfn').value.trim(),phone=$('#pfp').value.replace(/\s+/g,'');let e=0;
- if(name.length<2)e+=bad('pf_name','Nhập họ và tên (ít nhất 2 ký tự).');
- if(phone&&!/^(0|\+84)\d{9}$/.test(phone))e+=bad('pf_phone','Số điện thoại không hợp lệ (ví dụ 0912345678).');
- if(e)return;
- const us=getUsers(),u=us.find(x=>x.id===CUR.id);if(u){u.name=name;u.phone=phone;putUsers(us)}
- CUR.name=name;CUR.phone=phone;if(U[CUR.id])U[CUR.id].n=name;
- $('#dlg').close();toast('Đã cập nhật thông tin tài khoản.');refresh(true)}
-
+async function saveProfile(){
+ const name=$('#pfn').value.trim();
+ if(name.length<2){$('#pf_name').classList.add('bad');$('#pf_name .err').textContent='Nhập họ và tên (ít nhất 2 ký tự).';return;}
+ try {
+  const updated=await api('/users/me',{method:'PATCH',body:JSON.stringify({full_name:name})});
+  CUR.name=updated.full_name;
+  if(U[CUR.id])U[CUR.id].n=CUR.name;
+  sessionStorage.setItem(AUTH_BUSER_KEY,JSON.stringify(CUR));
+  $('#dlg').close();toast('Đã cập nhật thông tin tài khoản.');refresh(true);
+ } catch(err){toast(err.message);}
+}
 // ===== THÔNG BÁO (chuông) =====
 function nm(id){return U[id]?U[id].n:(CUR&&id===me()?(CUR.name||CUR.email||'Bạn'):'Người dùng')}
 function timeAgo(t){const m=Math.floor((Date.now()-t)/6e4);return m<1?'Vừa xong':m<60?m+' phút trước':m<1440?Math.floor(m/60)+' giờ trước':Math.floor(m/1440)+' ngày trước'}
@@ -294,13 +325,12 @@ function bellHtml(){const mine=NOTI.filter(x=>x.to===me()).sort((a,b)=>b.ts-a.ts
  <div class="blm" id="blm" hidden><div class="blh"><b>Thông báo</b><button onclick="readAll()">Đánh dấu đã đọc</button></div><div class="bll">${mine.length?mine.map(x=>`<button class="bli ${x.read?'':'un'}" onclick="openNoti(${x.id})"><span class="bie">${x.ic}</span><span><b>${esc(x.t)}</b><small>${timeAgo(x.ts)}</small></span></button>`).join(''):'<div class="bln">Chưa có thông báo nào.</div>'}</div></div></div>`}
 function toggleBell(){const m=$('#blm'),open=m.hidden;closeUM();m.hidden=!open;$('#blb').setAttribute('aria-expanded',open)}
 function closeBell(){const m=$('#blm');if(m){m.hidden=true;$('#blb').setAttribute('aria-expanded','false')}}
-function readAll(){NOTI.forEach(x=>{if(x.to===me())x.read=true});save();side()}
-function openNoti(id){const n=NOTI.find(x=>x.id===id);if(!n||n.to!==me())return;n.read=true;save();closeBell();
- const [v,t]=n.link.split(':');if(v==='orders'){S.ot=t||'buy';S.og='all'}go(['home','saved','mine','orders'].includes(v)?v:'home');side()}
+async function readAll(){try{await api('/notifications/read-all',{method:'POST'});await loadFromApi();side()}catch(e){toast(e.message)}}
+async function openNoti(id){const n=NOTI.find(x=>x.id===id);if(!n||n.to!==me())return;try{await api('/notifications/'+id+'/read',{method:'PATCH'});await loadFromApi()}catch(e){toast(e.message)}closeBell();const [v,t]=n.link.split(':');if(v==='orders'){S.ot=t||'buy';S.og='all'}go(['home','saved','mine','orders'].includes(v)?v:'home');side()}
 document.addEventListener('click',e=>{if(!e.target.closest('.bl'))closeBell()});
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeBell()});
 addEventListener('storage',e=>{if(e.key===KEY&&CUR)side()});
-if(CUR&&!localStorage.getItem('cdcsv_wl_'+me())){notify(me(),'Chào mừng bạn đến với Chợ đồ cũ sinh viên! Hãy đăng tin hoặc đặt mua món đầu tiên.','home','👋');localStorage.setItem('cdcsv_wl_'+me(),'1');save();side()}
+// Không tự tạo thông báo giả trong localStorage; thông báo nghiệp vụ phải đến từ Backend.
 
 
 /* extras.js – bổ sung cho trang chợ (index.html). Nạp SAU app.js. */
@@ -395,16 +425,15 @@ mineHtml = function () {
   document.head.appendChild(s);
 })();
 
-let RV = { l: 0, star: 0 };
+let RV = { l: 0, offer: 0, star: 0 };
 const RVTXT = ['Chọn số sao', 'Tệ', 'Chưa tốt', 'Bình thường', 'Tốt', 'Rất tốt'];
 
 // Chỉ người MUA của tin đã bán (đề nghị được chấp nhận, hoặc đơn đã nhận hàng) và chưa đánh giá mới được đánh giá
 function canReview(l) {
   const m = me();
   if (!CUR || !l || l.s === m) return false;
-  if (R.some(r => r.l === l.id && r.f === m)) return false;
-  return O.some(o => o.l === l.id && o.f === m && o.st === 'accepted') ||
-         ORD.some(o => o.l === l.id && o.b === m && o.st === 'done');
+  const accepted = O.find(o => o.l === l.id && o.f === m && o.st === 'accepted');
+  return !!accepted && !R.some(r => r.offer_id === accepted.id);
 }
 function repTxtL(lid) {
   const r = R.filter(x => x.l === lid);
@@ -438,7 +467,9 @@ function starBtns(n) {
 function openReview(lid) {
   const l = L.find(x => x.id === lid);
   if (!canReview(l)) return toast('Bạn chưa thể đánh giá giao dịch này.');
-  RV = { l: lid, star: 0 };
+  const accepted = O.find(o => o.l === lid && o.f === me() && o.st === 'accepted');
+  if (!accepted) return toast('Không tìm thấy đề nghị đã được chấp nhận để đánh giá.');
+  RV = { l: lid, offer: accepted.id, star: 0 };
   openDlg(`${dh('Đánh giá người bán')}<div class="db">
    <div class="sel"><div class="av">${esc(nm(l.s)[0])}</div><div><b>${esc(nm(l.s))}</b><div class="mut">Giao dịch: ${esc(l.t)}</div></div></div>
    <div class="f" id="rvf1">Mức độ hài lòng *<div id="rvst">${starBtns(0)}</div><span class="mut" id="rvlb">${RVTXT[0]}</span><span class="err"></span></div>
@@ -446,7 +477,7 @@ function openReview(lid) {
    <button class="btn" onclick="submitRv()">Gửi đánh giá</button></div>`);
 }
 function pickStar(n) { RV.star = n; $('#rvst').innerHTML = starBtns(n); $('#rvlb').textContent = RVTXT[n]; }
-function submitRv() {
+async function submitRv() {
   const l = L.find(x => x.id === RV.l);
   const bad = (id, m) => { const f = $('#' + id); f.classList.add('bad'); f.querySelector('.err').textContent = m; return 1; };
   ['rvf1', 'rvf2'].forEach(i => { $('#' + i).classList.remove('bad'); $('#' + i).querySelector('.err').textContent = ''; });
@@ -455,13 +486,17 @@ function submitRv() {
   if (!RV.star) e += bad('rvf1', 'Vui lòng chọn số sao từ 1 đến 5.');
   if (x.length < 3) e += bad('rvf2', 'Nhận xét cần ít nhất 3 ký tự.');
   if (e) return;
-  if (!canReview(l)) return toast('Bạn không thể đánh giá giao dịch này (403).');
-  R.push({ l: l.id, to: l.s, f: me(), star: RV.star, x, t: Date.now() });
-  ORD.forEach(o => { if (o.l === l.id && o.b === me()) o.rv = true; });
-  notify(l.s, `${nm(me())} đã đánh giá bạn ${RV.star} sao cho "${l.t}"`, 'home', '⭐');
-  $('#dlg').close();
-  toast('Cảm ơn bạn đã đánh giá người bán.');
-  refresh(true);
+  if (!l || !RV.offer) return toast('Không tìm thấy giao dịch hợp lệ để đánh giá.');
+  try {
+    await api('/offers/' + RV.offer + '/review', {
+      method: 'POST',
+      body: JSON.stringify({ rating: RV.star, comment: x })
+    });
+    $('#dlg').close();
+    toast('Đã gửi đánh giá lên máy chủ.');
+    await loadFromApi();
+    refresh(true);
+  } catch (err) { toast(err.message); }
 }
 // Nút "Đánh giá" ở trang Đơn hàng cũng dùng form mới
 reviewForm = function (oid) { const o = ORD.find(x => x.id === oid); if (o) openReview(o.l); };
@@ -474,7 +509,7 @@ reviewForm = function (oid) { const o = ORD.find(x => x.id === oid); if (o) open
 reviewsHtml = function (sid, lid) {
   const rs = R.filter(r => r.to === sid && (!lid || r.l === lid)).reverse().slice(0, 5);
   if (!rs.length) return '<div class="mut">Sản phẩm này chưa có đánh giá nào.</div>';
-  return rs.map(r => `<div class="rvl"><div><span class="stars">${'★'.repeat(r.star)}${'☆'.repeat(5 - r.star)}</span> <b>${esc(nm(r.f))}</b>${r.ed ? ' <span class="mut">· đã chỉnh sửa</span>' : ''}</div><div class="mut">${esc(r.x)}</div></div>`).join('');
+  return rs.map(r => `<div class="rvl"><div><span class="stars">${'★'.repeat(r.star)}${'☆'.repeat(5 - r.star)}</span> <b>${esc(nm(r.f))}</b></div><div class="mut">${esc(r.x)}</div></div>`).join('');
 };
 
 // Trang chi tiết sản phẩm: người đã đánh giá thấy nút "Sửa đánh giá"
@@ -531,7 +566,7 @@ function submitEditRv() {
 /* ===== ĐỒNG BỘ SỐ ĐẾM VÀ DANH SÁCH ĐÁNH GIÁ ===== */
 function reviewsOf(lid) {
   const l = L.find(x => x.id === lid);
-  return l ? R.filter(r => r.l === lid && r.to === l.s) : [];
+  return l ? R.filter(r => r.to === l.s) : [];
 }
 repTxtL = function (lid) {
   const r = reviewsOf(lid);
@@ -597,7 +632,7 @@ submitPost = async function () {
 
 
 
-/* ===== TỰ CẬP NHẬT DỮ LIỆU TỪ BACKEND (2 giây) ===== */
+/* ===== TỰ CẬP NHẬT DỮ LIỆU TỪ BACKEND (30 giây) ===== */
 let syncing = false;
 async function autoSync() {
   if (syncing || document.hidden || posting) return;
@@ -607,5 +642,8 @@ async function autoSync() {
   try { await loadFromApi(); refresh(); } catch (e) { /* lần sau thử lại */ }
   finally { syncing = false; }
 }
-setInterval(autoSync, 2000);
+setInterval(autoSync, 30000);
 document.addEventListener('visibilitychange', () => { if (!document.hidden) autoSync(); });
+
+// Backend hiện chỉ hỗ trợ tạo và đọc đánh giá; không giả lập sửa đánh giá ở local.
+editReview = function () { toast('Backend hiện chưa cung cấp chức năng sửa đánh giá.'); };

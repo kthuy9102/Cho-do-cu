@@ -78,6 +78,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Set up Node.js for Postman/Newman
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
       - name: Create CI-only environment
         shell: bash
         run: |
@@ -103,6 +108,23 @@ jobs:
           curl --fail --silent --show-error http://localhost:8080/openapi.json -o /tmp/openapi.json
           grep -q '"openapi"' /tmp/openapi.json
           grep -q '"/api/v1/auth/login"' /tmp/openapi.json
+
+      - name: Seed isolated CI demo accounts and listings
+        run: docker compose exec -T backend python -m scripts.seed
+
+      - name: Run Postman API integration suite (00-06 and 08)
+        run: |
+          npx --yes newman run backend/postman/chodocu.postman_collection.json \
+            --environment backend/postman/chodocu.postman_environment.json \
+            --env-var "base_url=http://localhost:8080" \
+            --folder "00 Hệ thống" \
+            --folder "01 Xác thực" \
+            --folder "02 Phân quyền và danh mục" \
+            --folder "03 Tin đăng và kiểm duyệt" \
+            --folder "04 Mua bán và đánh giá" \
+            --folder "05 Báo cáo và yêu thích" \
+            --folder "06 Định dạng lỗi và request_id" \
+            --folder "08 Đơn hàng và thông báo"
 
       - name: Show container logs on failure
         if: failure()
