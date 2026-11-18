@@ -179,6 +179,8 @@ async function loadFromApi() {
     ORD.forEach(o => { o.rv = R.some(review => review.offer_id === o.offer_id); });
   } else {
     O = [];
+    ORD = [];
+    NOTI = [];
     S.fav = new Set();
   }
 
