@@ -77,6 +77,8 @@ Thư mục `postman/` có 2 file: `chodocu.postman_collection.json` (94 request,
 Chạy bằng dòng lệnh (dùng được trong CI nếu có server): `npx newman run postman/chodocu.postman_collection.json -e postman/chodocu.postman_environment.json`.
 
 
+Container backend chạy `alembic upgrade head` trước khi khởi động API; Docker image đã đóng gói `migrations/` và `alembic.ini`. Khi chạy trực tiếp ngoài Docker, tự chạy migration trước khi bật Uvicorn.
+
 ## 2.1. Quản lý schema bằng Alembic
 
 Alembic là nguồn quản lý phiên bản cấu trúc CSDL. Không dùng `Base.metadata.create_all()` trong quy trình triển khai production.
@@ -202,7 +204,7 @@ API đầy đủ có 50 endpoint (bảng ở trên); 20 endpoint sau là luồng
 | 20 | POST | `/listings/{id}/images` (upload ảnh) | Chủ tin | 201 |
 
 Collection 20 request chạy theo đúng thứ tự trên bằng Runner (request 20 cần chọn file ảnh nên bỏ tick khi chạy Runner). Mỗi lần chạy tạo 3 tin của người bán.
-Collection 82 request (`chodocu.postman_collection.json`) bổ sung các ca lỗi 401, 403, 409, 422, 429.
+Collection chính có 94 request (`chodocu.postman_collection.json`): 82 request cũ và 12 request mới ở thư mục `08`, bao phủ luồng đơn hàng/thông báo cùng các ca lỗi 401, 403, 409, 422, 429.
 
 ## 5. Luồng JWT (slide 8)
 
