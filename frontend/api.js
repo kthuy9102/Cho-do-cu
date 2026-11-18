@@ -157,6 +157,11 @@ async function loadFromApi() {
     const offers = [...(sent.items || []), ...(received.items || [])];
     O = [...new Map(offers.map(x => [x.id, x])).values()].map(mapOffer);
     ORD = (orders.items || []).map(mapOrder);
+    ORD.forEach(o => {
+      const source = (orders.items || []).find(x => x.id === o.id);
+      if (source?.buyer) U[source.buyer.id] = { n: source.buyer.full_name, h: "" };
+      if (source?.seller) U[source.seller.id] = { n: source.seller.full_name, h: "" };
+    });
     NOTI = (notifications.items || []).map(mapNotification);
     S.fav = new Set((favorites.items || []).map(x => x.id));
 
@@ -171,6 +176,7 @@ async function loadFromApi() {
       offer_id: x.offer_id, to: x.seller_id, f: x.reviewer?.id,
       star: x.rating, x: x.comment || ""
     })));
+    ORD.forEach(o => { o.rv = R.some(review => review.offer_id === o.offer_id); });
   } else {
     O = [];
     S.fav = new Set();
