@@ -161,6 +161,11 @@ async function loadFromApi() {
       const source = (orders.items || []).find(x => x.id === o.id);
       if (source?.buyer) U[source.buyer.id] = { n: source.buyer.full_name, h: "" };
       if (source?.seller) U[source.seller.id] = { n: source.seller.full_name, h: "" };
+      const listing = source?.listing;
+      if (listing && !L.some(item => item.id === listing.id)) {
+        L.push({ id: listing.id, t: listing.title, p: listing.price, s: listing.seller_id,
+          st: listing.status === "sold" ? "sold" : "approved", c: 0, k: 1, a: 0, n: 0, im: null, e: "📦", ds: "" });
+      }
     });
     NOTI = (notifications.items || []).map(mapNotification);
     S.fav = new Set((favorites.items || []).map(x => x.id));
