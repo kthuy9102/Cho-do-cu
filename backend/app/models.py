@@ -89,6 +89,7 @@ class User(Base):
     role: Mapped[Role] = mapped_column(_enum(Role), default=Role.student)
     is_active: Mapped[bool] = mapped_column(default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    actor: Mapped[Optional[User]] = relationship(foreign_keys=[actor_id])
 
     listings: Mapped[list["Listing"]] = relationship(back_populates="seller")
 
@@ -252,6 +253,10 @@ class Order(Base):
     status: Mapped[OrderStatus] = mapped_column(_enum(OrderStatus), default=OrderStatus.confirmed, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    listing: Mapped[Listing] = relationship()
+    buyer: Mapped[User] = relationship(foreign_keys=[buyer_id])
+    seller: Mapped[User] = relationship(foreign_keys=[seller_id])
 
 
 class Notification(Base):
