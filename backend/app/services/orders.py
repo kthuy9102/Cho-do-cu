@@ -37,12 +37,19 @@ def create_listing_order(db: Session, listing_id: int, buyer: User, payload: Ord
     ).limit(1))
     if active:
         raise ConflictError("Tin này đã có đơn hàng đang xử lý", code="listing_has_active_order")
-    offer = Offer(
-        listing_id=listing.id, buyer_id=buyer.id, amount=listing.price,
-        message=payload.note, status=OfferStatus.pending,
-    )
-    db.add(offer)
-    db.flush()
+    offer = db.scalar(select(Offer).where(
+        Offer.listing_id == listing.id, Offer.buyer_id == buyer.id, Offer.status == OfferStatus.pending
+    ).with_for_update())
+    if offer is None:
+        offer = Offer(
+            listing_id=listing.id, buyer_id=buyer.id, amount=listing.price,
+            message=payload.note, status=OfferStatus.pending,
+        )
+        db.add(offer)
+        db.flush()
+    else:
+        offer.amount = listing.price
+        offer.message = payload.note
     order = Order(
         offer_id=offer.id,
         listing_id=listing.id,
