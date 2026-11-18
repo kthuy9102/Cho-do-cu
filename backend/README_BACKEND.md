@@ -9,14 +9,14 @@ Minh chứng trên GitHub: `app/routers/`, `app/security/`, `app/schemas/` (cùn
 app/
 ├── main.py              # tạo app, middleware, CORS, đăng ký router, /health
 ├── config.py            # đọc .env (pydantic-settings), kiểm tra JWT_SECRET_KEY
-├── routers/             # auth, users, categories, listings, offers, reviews, reports, favorites, moderation
+├── routers/             # auth, users, categories, listings, offers, orders, notifications, reviews, reports, favorites, moderation
 ├── schemas/             # Pydantic: kiểm chứng dữ liệu vào/ra, Page[T], ErrorResponse
 ├── security/
 │   ├── passwords.py     # Argon2id: hash/verify/rehash
 │   ├── tokens.py        # tạo/giải mã JWT HS256
 │   ├── dependencies.py  # get_current_user, require_roles, require_admin/moderator
 │   └── throttle.py      # chặn dò mật khẩu (5 lần sai / 15 phút / (IP, email))
-├── services/            # nghiệp vụ dùng chung: listings, offers (transaction), uploads
+├── services/            # nghiệp vụ dùng chung: listings, offers/orders (transaction), notifications, uploads
 ├── core/                # exceptions, error_handlers, logging_config, middleware, pagination
 ├── models.py, database.py   # THAM KHẢO: thuộc phân hệ CSDL, thay bằng bản chính thức của nhóm
 ```
@@ -57,7 +57,7 @@ Test **không** kiểm được khóa dòng `FOR UPDATE` (SQLite bỏ qua); cầ
 
 ### Postman
 
-Thư mục `postman/` có 2 file: `chodocu.postman_collection.json` (82 request, mỗi request có test script) và `chodocu.postman_environment.json`.
+Thư mục `postman/` có 2 file: `chodocu.postman_collection.json` (94 request, mỗi request có test script) và `chodocu.postman_environment.json`.
 
 1. Import cả hai vào Postman, chọn environment **Chợ đồ cũ - local**.
 2. Chạy server và seed dữ liệu demo (mục trên). Nên đặt `MAX_LISTINGS_PER_DAY=50` trong `.env` khi test, vì mỗi lần chạy tạo 2 tin của người bán.
@@ -72,7 +72,7 @@ Thư mục `postman/` có 2 file: `chodocu.postman_collection.json` (82 request,
 | 03 Tin đăng và kiểm duyệt | tin chờ duyệt, duyệt, lọc/sắp xếp/phân trang, sửa tin thì duyệt lại |
 | 04 Mua bán và đánh giá | đề nghị, chấp nhận (tin thành sold), đánh giá, điểm uy tín |
 | 05 Báo cáo và yêu thích | báo cáo, ẩn tin vi phạm, yêu thích |
-| 06 Định dạng lỗi và request_id | mọi lỗi cùng một dạng, có request_id |
+| 06 Định dạng lỗi và request_id | mọi lỗi cùng một dạng, có request_id |\n| 08 Đơn hàng và thông báo | đặt mua, xác nhận, giao, hoàn tất, đọc thông báo |
 
 Chạy bằng dòng lệnh (dùng được trong CI nếu có server): `npx newman run postman/chodocu.postman_collection.json -e postman/chodocu.postman_environment.json`.
 
@@ -155,6 +155,16 @@ Quy tắc đi kèm: không tự duyệt tin của mình; admin không tự đổ
 | GET | `/offers/sent`, `/offers/received`, `/offers/{id}` | Người trong cuộc | 200 | 404 |
 | POST | `/offers/{id}/accept`, `/reject` | Người bán | 200 | 404, 409 |
 | POST | `/offers/{id}/cancel` | Người mua | 200 | 404, 409 |
+| POST | `/listings/{id}/orders` | Người mua | 201 | 401, 403, 404, 409, 422 |
+| GET | `/orders?side=buying|selling|all` | Người trong cuộc | 200 | 401, 422 |
+| GET | `/orders/{id}` | Người mua/người bán | 200 | 401, 404 |
+| POST | `/orders/{id}/confirm` | Người bán | 200 | 404, 409 |
+| POST | `/orders/{id}/ship` | Người bán | 200 | 404, 409 |
+| POST | `/orders/{id}/complete` | Người mua | 200 | 404, 409 |
+| POST | `/orders/{id}/cancel` | Người mua/người bán, trước khi giao | 200 | 404, 409 |
+| GET | `/notifications`, `/notifications/unread-count` | Chủ tài khoản | 200 | 401, 422 |
+| PATCH | `/notifications/{id}/read` | Người nhận | 200 | 401, 404 |
+| POST | `/notifications/read-all` | Chủ tài khoản | 204 | 401 |
 | POST | `/offers/{id}/review` | Người mua (sau khi được chấp nhận) | 201 | 404, 409, 422 |
 | POST | `/listings/{id}/reports` | Đăng nhập | 201 | 403, 404, 409 |
 | PUT / DELETE | `/listings/{id}/favorite` | Đăng nhập | 204 | 404 |
@@ -166,7 +176,7 @@ Quy tắc đi kèm: không tự duyệt tin của mình; admin không tự đổ
 
 ### 20 endpoint chính (dùng cho slide 7 và demo)
 
-API đầy đủ có 39 endpoint (bảng ở trên); 20 endpoint sau là luồng nghiệp vụ chính, ứng với 20 request trong `postman/chodocu_20api.postman_collection.json`.
+API đầy đủ có 50 endpoint (bảng ở trên); 20 endpoint sau là luồng nghiệp vụ chính, ứng với 20 request trong `postman/chodocu_20api.postman_collection.json`.
 
 | # | Method | Đường dẫn | Quyền | Thành công |
 |---|---|---|---|---|
