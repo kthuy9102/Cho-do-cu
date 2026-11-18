@@ -37,7 +37,14 @@ def create_listing_order(db: Session, listing_id: int, buyer: User, payload: Ord
     ).limit(1))
     if active:
         raise ConflictError("Tin này đã có đơn hàng đang xử lý", code="listing_has_active_order")
+    offer = Offer(
+        listing_id=listing.id, buyer_id=buyer.id, amount=listing.price,
+        message=payload.note, status=OfferStatus.pending,
+    )
+    db.add(offer)
+    db.flush()
     order = Order(
+        offer_id=offer.id,
         listing_id=listing.id,
         buyer_id=buyer.id,
         seller_id=listing.seller_id,
@@ -75,6 +82,13 @@ def transition_order(db: Session, order_id: int, action: str, user: User) -> Ord
             raise ConflictError("Tin đăng không còn khả dụng", code="listing_not_available")
         listing.status = ListingStatus.sold
         order.status = OrderStatus.confirmed
+        offer = db.get(Offer, order.offer_id) if order.offer_id else None
+        if offer is not None:
+            offer.status = OfferStatus.accepted
+        db.query(Offer).filter(
+            Offer.listing_id == listing.id, Offer.id != (order.offer_id or 0),
+            Offer.status == OfferStatus.pending,
+        ).update({Offer.status: OfferStatus.rejected}, synchronize_session=False)
         notify(db, order.buyer_id, "order_confirmed", "Đơn hàng đã được xác nhận",
                f"Người bán đã xác nhận đơn #{order.id}.", actor_id=user.id,
                resource_type="order", resource_id=order.id)
@@ -104,7 +118,7 @@ def transition_order(db: Session, order_id: int, action: str, user: User) -> Ord
         offer = db.get(Offer, order.offer_id)
         if listing is not None and listing.status == ListingStatus.sold:
             listing.status = ListingStatus.approved
-        if offer is not None and offer.status == OfferStatus.accepted:
+        if offer is not None and offer.status in (OfferStatus.pending, OfferStatus.accepted):
             offer.status = OfferStatus.cancelled
         other_party = order.seller_id if user.id == order.buyer_id else order.buyer_id
         notify(db, other_party, "order_cancelled", "Đơn hàng đã bị hủy",
