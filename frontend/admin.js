@@ -7,6 +7,9 @@
 const ADM = () => sessionStorage.getItem(AKEY) === '1' && !!sessionStorage.getItem(AUTH_TOKEN_KEY);
 
 let tab = 'pending';
+let admUsers = [];
+const admCurrentUser = () => { try { return JSON.parse(sessionStorage.getItem(AUTH_BUSER_KEY) || 'null'); } catch (_) { return null; } };
+const admIsAdmin = () => admCurrentUser()?.role === 'admin';
 
 getUsers().forEach(u => {
     U[u.id] = {
@@ -216,6 +219,7 @@ function dash() {
         ['reports', `Báo cáo vi phạm (${Rp.length})`],
         ['all', `Tất cả tin (${A.length})`]
     ];
+    if (admIsAdmin()) T.push(['users', `Người dùng (${admUsers.length})`]);
 
     let h = `
         <div class="card tabs">
@@ -276,6 +280,20 @@ function dash() {
                 );
             }).join('')
             : '<div class="empty">Không có báo cáo nào.</div>';
+    }
+
+    // Quản lý tài khoản (chỉ admin; Backend vẫn kiểm tra quyền ở API).
+    if (tab === 'users') {
+        h += admUsers.length ? `
+            <div class="pad"><p class="mut">Chỉ quản trị viên mới được khóa hoặc mở khóa tài khoản. Không thể tự khóa tài khoản đang đăng nhập.</p>
+            ${admUsers.map(u => `
+                <div class="ls">
+                    <div class="gr"><b>${esc(u.full_name)}</b><span class="mut">${esc(u.email)} · ${esc(u.role)}</span></div>
+                    <div class="acts"><span class="badge ${u.is_active ? '' : 'x'}">${u.is_active ? 'Đang hoạt động' : 'Đã khóa'}</span>
+                    ${u.id === admCurrentUser()?.id ? '<span class="mut">Tài khoản hiện tại</span>' : `<button class="btn sm ${u.is_active ? 'r' : 'o'}" onclick="admSetUserActive(${u.id},${!u.is_active})">${u.is_active ? 'Khóa' : 'Mở khóa'}</button>`}
+                    </div>
+                </div>`).join('')}
+            </div>` : '<div class="empty">Chưa có tài khoản nào.</div>';
     }
 
     // Tất cả tin
@@ -683,14 +701,20 @@ async function admLoad() {
       if (x.listing && x.listing.seller) U[x.listing.seller.id] = { n: x.listing.seller.full_name, h: '' };
       return { id: x.id, l: x.listing.id, f: x.reporter.id, x: x.detail || x.reason_code, open: x.status === 'open' };
     });
+    const current = admCurrentUser();
+    const usersResponse = current?.role === 'admin'
+      ? await admFetch('/users?page_size=100')
+      : { items: [] };
     // Chỉ thay dữ liệu sau khi tất cả request thành công.
     L = all;
     RP = mappedReports;
+    admUsers = usersResponse.items || [];
     admState = 2;
   } catch (e) {
     // Không để dữ liệu mẫu/local còn trong bộ nhớ bị hiển thị như dữ liệu máy chủ.
     L = [];
     RP = [];
+    admUsers = [];
     admError = e.message || 'Không tải được dữ liệu quản trị từ máy chủ.';
     admState = 3;
   }
@@ -699,8 +723,9 @@ async function admLoad() {
 
 render = function () {
   const on = isAdm();
+  const roleLabel = admIsAdmin() ? 'Quản trị viên' : 'Kiểm duyệt viên';
   $('#who').innerHTML = on
-    ? `<span class="wn">Kiểm duyệt viên</span><button class="btn o sm" onclick="adminLogout();render()">Đăng xuất</button>`
+    ? `<span class="wn">${roleLabel}</span><button class="btn o sm" onclick="adminLogout();render()">Đăng xuất</button>`
     : '';
   if (!on) { admState = 0; $('#app').innerHTML = loginHtml(); return; }
   if (admState === 0) { admState = 1; admLoad(); }
@@ -710,6 +735,20 @@ render = function () {
       ? `<div class="card empty"><p>Không thể tải dữ liệu quản trị: ${esc(admError)}</p><button class="btn" onclick="admState=0;render()">Thử tải lại</button></div>`
       : '<div class="card empty">Đang tải dữ liệu từ máy chủ...</div>';
 };
+
+async function admSetUserActive(userId, active) {
+  try {
+    await admFetch('/users/' + userId + '/active', {
+      method: 'PATCH',
+      body: JSON.stringify({ is_active: active })
+    });
+    toast(active ? 'Đã mở khóa tài khoản.' : 'Đã khóa tài khoản.');
+    admState = 0;
+    await admLoad();
+  } catch (e) {
+    toast(e.message || 'Không cập nhật được tài khoản.');
+  }
+}
 
 async function admAct(path, body, okMsg) {
   try {
